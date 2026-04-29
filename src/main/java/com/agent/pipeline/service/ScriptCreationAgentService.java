@@ -88,18 +88,19 @@ public class ScriptCreationAgentService {
 
         interventionAssistantService.completeIntervention(sessionId, humanFeedback);
 
-        Map<String, Object> interventionState = new java.util.HashMap<>();
-        interventionState.put(ScriptGraphState.KEY_HUMAN_INTERVENTION, humanFeedback);
-
         RunnableConfig config = RunnableConfig.builder()
                 .threadId(sessionId)
-                .build()
-                .withResume();
+                .build();
+
+        Map<String, Object> interventionState = new java.util.HashMap<>();
+        interventionState.put(ScriptGraphState.KEY_HUMAN_INTERVENTION, humanFeedback);
 
         java.util.concurrent.atomic.AtomicReference<NodeOutput> lastOutputRef = new java.util.concurrent.atomic.AtomicReference<>();
 
         try {
-            return scriptCreationGraph.stream(interventionState, config)
+            // 核心修复：在恢复执行前，必须显式将人类指令更新到持久化的 Checkpoint 中
+            scriptCreationGraph.updateState(config, interventionState);
+            return scriptCreationGraph.stream(null, config.withResume())
                     .doOnNext(output -> {
                         log.info("接关后节点输出: {}", output.node());
                         lastOutputRef.set(output);

@@ -40,11 +40,13 @@ public class ScriptGraphConfig {
         var writer   = node_async(new WriterNode(llmClient, workflowProperties));
         var reviewer = node_async(new ReviewerNode(llmClient, workflowProperties));
         
-        // 新增：导演拍板节点（空节点，仅用于承载路由逻辑，防止直接 __END__ 导致断点被绕过）
+        // 新增：看门人节点（空节点，仅用于承载路由逻辑，并作为物理断点位）
+        var plannerApproval  = node_async(state -> state.data());
         var directorApproval = node_async(state -> state.data());
 
         StateGraph workflow = new StateGraph(ScriptGraphState.createKeyStrategyFactory())
                 .addNode("planner", planner)
+                .addNode("planner_approval", plannerApproval)
                 .addNode("writer", writer)
                 .addNode("reviewer", reviewer)
                 .addNode("director_approval", directorApproval);
@@ -52,13 +54,17 @@ public class ScriptGraphConfig {
         // --- 图路由配置 ---
         workflow.addEdge(START, "planner");
 
-        // 人机协作路由：Planner 阶段（导演审阅大纲 + 参谋建议）
-        workflow.addConditionalEdges("planner", edge_async(state -> {
+        // 策划完活后必须经过策划看门人
+        workflow.addEdge("planner", "planner_approval");
+
+        // 策划看门人路由逻辑
+        workflow.addConditionalEdges("planner_approval", edge_async(state -> {
             String feedback = (String) state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).orElse("");
             if (feedback.contains("重写") || feedback.contains("重做") || feedback.contains("不行")) {
-                log.info("🎯 [协作路由] 导演指令：打回重做策划...");
+                log.info("🎯 [协作路由] 导演下令：策划不通过，打回重写。");
                 return "planner";
             }
+            log.info("🎯 [协作路由] 导演下令：策划通过，进入编剧环节。");
             return "writer";
         }), Map.of("planner", "planner", "writer", "writer"));
 
@@ -67,26 +73,26 @@ public class ScriptGraphConfig {
         // 确保一定会走到导演拍板节点，从而强制触发 reviewer 后的断点
         workflow.addEdge("reviewer", "director_approval");
 
-        // 人机协作路由：Reviewer 阶段（导演终审）
+        // 终审看门人路由逻辑
         workflow.addConditionalEdges("director_approval", edge_async(state -> {
             String feedback = (String) state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).orElse("");
             
-            // 1. 人类拥有绝对优先的拍板权：
+            // 1. 人类绝对优先拍板
             if (feedback.contains("通过")) {
-                log.info("🎯 [协作路由] 导演拍板：强制通过！");
+                log.info("🎯 [协作路由] 导演下令：正式通过，项目完结。");
                 return "finish";
             } else if (feedback.contains("重写") || feedback.contains("重做") || feedback.contains("不行")) {
-                log.info("🎯 [协作路由] 导演拍板：打回重写...");
+                log.info("🎯 [协作路由] 导演下令：剧本不通过，打回重写。");
                 return "writer";
             }
             
-            // 2. 如果人类未给出明确的打回/通过指令，才参考机器评审结果
+            // 2. 默认参考机器评审
             boolean approved = (Boolean) state.value(ScriptGraphState.KEY_APPROVED).orElse(false);
             if (approved) {
-                log.info("🎯 [协作路由] 默认采纳机器评审：审核通过，全剧终。");
+                log.info("🎯 [协作路由] 默认采纳机器评审：审核通过。");
                 return "finish";
             } else {
-                log.info("🎯 [协作路由] 默认采纳机器评审：打回给编剧修改。");
+                log.info("🎯 [协作路由] 默认采纳机器评审：打回重写。");
                 return "writer";
             }
         }), Map.of("writer", "writer", "finish", END));
@@ -117,8 +123,9 @@ public class ScriptGraphConfig {
             }
         });
 
-        if ("SELECTIVE".equalsIgnoreCase(workflowProperties.getMode()) && workflowProperties.getBreakpoints() != null) {
-            compileConfigBuilder.interruptsAfter(workflowProperties.getBreakpoints());
+        if ("SELECTIVE".equalsIgnoreCase(workflowProperties.getMode())) {
+            // 统一在看门人节点前挂起，确保日志顺序为：挂起 -> 参谋建议 -> 人类指令 -> 进入看门人节点 -> 执行并路由
+            compileConfigBuilder.interruptBefore("planner_approval", "director_approval");
         }
 
         return workflow.compile(compileConfigBuilder.build());
