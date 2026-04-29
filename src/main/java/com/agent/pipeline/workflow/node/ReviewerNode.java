@@ -56,6 +56,8 @@ public class ReviewerNode implements NodeAction, InterruptableAction {
         String script = state.value(ScriptGraphState.KEY_SCRIPT).map(v -> (String) v).orElse("");
         int retryCount = state.value(ScriptGraphState.KEY_RETRY_COUNT).map(v -> (Integer) v).orElse(0);
 
+        log.info("📊 [审稿节点] 收到数据 - 大纲长度: {}, 剧本长度: {}, 重试次数: {}", outline.length(), script.length(), retryCount);
+
         if (retryCount >= MAX_RETRY) {
             log.warn("⚠️ 剧本已被打回修改超过 {} 次，强制通过审稿！", MAX_RETRY);
             return Map.of(

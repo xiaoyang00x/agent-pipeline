@@ -6,7 +6,6 @@ APP_PID=$!
 echo "⏳ 等待应用在 8080 端口启动..."
 while ! nc -z localhost 8080; do
   sleep 1
-  # 如果进程退出了，直接终止
   if ! kill -0 $APP_PID 2>/dev/null; then
     echo "❌ Spring Boot 启动失败，请检查 app_run.log"
     cat app_run.log
@@ -15,22 +14,23 @@ while ! nc -z localhost 8080; do
 done
 echo "✅ 应用已成功启动！PID: $APP_PID"
 
-SESSION_ID="redo-test-$(date +%s)"
-echo -e "\n🎬 [2/5] 触发剧本生成工作流 (Topic: Wuxia Mystery)..."
-curl -s "http://localhost:8080/agent/create-script?topic=WuxiaMystery&requirement=Test&sessionId=${SESSION_ID}" | jq .
+SESSION_ID="arch-test-$(date +%s)"
+echo -e "\n🎬 [2/5] 触发剧本生成工作流 (Topic: 校园推理)..."
+echo "  → 预期流程: START → planner → advisor → [断点] → 等待导演"
+curl -s "http://localhost:8080/agent/create-script?topic=CampusMystery&requirement=Test&sessionId=${SESSION_ID}" | jq .
 
-echo -e "\n⏳ 等待 3 秒，让参谋 Agent 准备建议..."
+echo -e "\n⏳ 等待 3 秒..."
 sleep 3
 
-echo -e "\n💡 [3/5] 获取参谋 Agent 建议..."
+echo -e "\n💡 [3/5] 获取参谋建议（应来自 AdvisorNode 写入 State 的内容）..."
 curl -s "http://localhost:8080/intervention/${SESSION_ID}/advice" | jq .
 
-echo -e "\n▶️ [4/5] 提交【打回重写】指令并接关 (Resume)..."
-# 注意：这里我们故意给出否定指令，验证路由是否会回到 planner
+echo -e "\n▶️ [4/5] 提交导演正面反馈并接关..."
+echo "  → 预期流程: writer → reviewer → END"
 curl -N -X POST "http://localhost:8080/intervention/${SESSION_ID}/resume" \
      -H "Content-Type: application/json" \
-     -d "{\"feedback\": \"不行，这个大纲武侠味不够，太现代化了，请打回重做，多加点古风意境。\"}" 
+     -d "{\"feedback\": \"大纲不错，请在剧本中突出密室推理的氛围感，加入翻转结局。\"}" 
 
 echo -e "\n\n🛑 [5/5] 测试完成，关闭 Spring Boot..."
 kill $APP_PID
-echo "✅ 流程执行完毕。"
+echo "✅ 流程执行完毕。SessionID: ${SESSION_ID}"

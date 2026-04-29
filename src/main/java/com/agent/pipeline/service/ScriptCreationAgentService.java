@@ -1,6 +1,6 @@
 package com.agent.pipeline.service;
 
-import com.agent.pipeline.model.InterventionEntity;
+
 import com.agent.pipeline.workflow.state.ScriptGraphState;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.NodeOutput;
