@@ -4,7 +4,7 @@ import com.alibaba.cloud.ai.graph.CompileConfig;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.checkpoint.config.SaverConfig;
-import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
+import com.alibaba.cloud.ai.graph.serializer.plain_text.jackson.SpringAIJacksonStateSerializer;
 import com.agent.pipeline.client.MiniMaxClient;
 import com.agent.pipeline.workflow.state.ScriptGraphState;
 import com.agent.pipeline.workflow.node.PlannerNode;
@@ -20,6 +20,9 @@ import static com.alibaba.cloud.ai.graph.StateGraph.END;
 import static com.alibaba.cloud.ai.graph.StateGraph.START;
 import static com.alibaba.cloud.ai.graph.action.AsyncEdgeAction.edge_async;
 import static com.alibaba.cloud.ai.graph.action.AsyncNodeAction.node_async;
+import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
+import com.alibaba.cloud.ai.graph.state.AgentStateFactory;
+import com.alibaba.cloud.ai.graph.OverAllState;
 
 /**
  * 剧本工作流配置类 (Graph Config)
@@ -71,10 +74,10 @@ public class ScriptGraphConfig {
         ));
 
         // 5. 配置记忆持久化引擎（MySQL 模式，后端连接 H2 兼容层）
-        // 使用自定义的 JsonStateSerializer，确保数据库中存储的是可读的 JSON 格式
+        // 从 workflow 中获取自动生成的 AgentStateFactory，并传给官方的 JSON 序列化器
         var saver = MysqlSaver.builder()
                 .dataSource(dataSource)
-                .stateSerializer(new JsonStateSerializer())
+                .stateSerializer(new SpringAIJacksonStateSerializer(workflow.getStateFactory()))
                 .build();
         var compileConfig = CompileConfig.builder()
                 .saverConfig(SaverConfig.builder().register(saver).build())
