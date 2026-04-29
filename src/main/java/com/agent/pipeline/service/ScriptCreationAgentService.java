@@ -96,11 +96,11 @@ public class ScriptCreationAgentService {
         if (finalOutput != null && finalOutput.state() != null) {
             // OverAllState 不是 Map，需用 .value(key) 方法逐个读取
             var state = finalOutput.state();
-            result.put("outline",         state.value(ScriptGraphState.KEY_OUTLINE).orElse("（未生成）"));
-            result.put("script",          state.value(ScriptGraphState.KEY_SCRIPT).orElse("（未生成）"));
-            result.put("approved",        state.value(ScriptGraphState.KEY_APPROVED).orElse(false));
+            result.put("outline", state.value(ScriptGraphState.KEY_OUTLINE).orElse("（未生成）"));
+            result.put("script", state.value(ScriptGraphState.KEY_SCRIPT).orElse("（未生成）"));
+            result.put("approved", state.value(ScriptGraphState.KEY_APPROVED).orElse(false));
             result.put("review_feedback", state.value(ScriptGraphState.KEY_REVIEW_FEEDBACK).orElse("无"));
-            result.put("retry_count",     state.value(ScriptGraphState.KEY_RETRY_COUNT).orElse(0));
+            result.put("retry_count", state.value(ScriptGraphState.KEY_RETRY_COUNT).orElse(0));
         }
 
         log.info("📦 最终结果已收集完毕，共执行节点: {}", nodesExecuted);

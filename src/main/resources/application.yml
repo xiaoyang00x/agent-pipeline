@@ -4,6 +4,18 @@ server:
 spring:
   application:
     name: agent-pipeline
+  datasource:
+    url: jdbc:h2:file:./data/agent_db;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  sql:
+    init:
+      mode: always # 启动时执行 schema.sql
+  h2:
+    console:
+      enabled: true # 开启控制台，方便你直接去页面查数据
+      path: /h2-console
 
 # MiniMax 直连配置（由 MiniMaxClient 读取，走 HTTP 直调，绕过 Spring AI 框架 Bug）
 minimax:
