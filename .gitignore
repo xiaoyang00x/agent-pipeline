@@ -1,3 +1,5 @@
 boot.log
 data/
 target/
+*.log
+Agent_HITL_*.md

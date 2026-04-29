@@ -1,132 +1,133 @@
 package com.agent.pipeline.service;
 
-import com.agent.pipeline.mapper.ScriptMapper;
-import com.agent.pipeline.model.ScriptEntity;
-import com.alibaba.cloud.ai.graph.CompiledGraph;
-import com.alibaba.cloud.ai.graph.RunnableConfig;
-import com.alibaba.cloud.ai.graph.NodeOutput;
+import com.agent.pipeline.model.InterventionEntity;
 import com.agent.pipeline.workflow.state.ScriptGraphState;
+import com.alibaba.cloud.ai.graph.CompiledGraph;
+import com.alibaba.cloud.ai.graph.NodeOutput;
+import com.alibaba.cloud.ai.graph.RunnableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * 剧本生成服务
- *
- * 驱动 Graph Core 执行 Planner → Writer → Reviewer 工作流。
- * 通过收集每个节点的输出 State，最终拼装出完整的结构化结果返回给前端。
- */
 @Service
 public class ScriptCreationAgentService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptCreationAgentService.class);
-    private final CompiledGraph scriptCreationGraph;
-    private final ScriptMapper scriptMapper;
 
-    public ScriptCreationAgentService(CompiledGraph scriptCreationGraph, ScriptMapper scriptMapper) {
+    private final CompiledGraph scriptCreationGraph;
+    private final InterventionAssistantService interventionAssistantService;
+
+    public ScriptCreationAgentService(CompiledGraph scriptCreationGraph,
+                                      InterventionAssistantService interventionAssistantService) {
         this.scriptCreationGraph = scriptCreationGraph;
-        this.scriptMapper = scriptMapper;
+        this.interventionAssistantService = interventionAssistantService;
     }
 
     /**
-     * 以流式方式运行剧本创作工作流。
-     *
-     * @param sessionId   会话唯一标识（用于追踪和记忆）
-     * @param topic       创作主题
-     * @param requirement 附加要求
-     * @return Flux 流，每个元素是一个节点执行完毕后的输出
+     * 阻塞式启动工作流（兼容 AgentController）
      */
-    public Flux<NodeOutput> createScriptStream(String sessionId, String topic, String requirement) {
-        // 1. 初始化白板上的输入数据
-        Map<String, Object> initialState = new HashMap<>();
-        initialState.put(ScriptGraphState.KEY_TOPIC, topic);
-        initialState.put(ScriptGraphState.KEY_REQUIREMENT, requirement);
-        initialState.put(ScriptGraphState.KEY_RETRY_COUNT, 0);
+    public Map<String, Object> createScriptBlocking(String topic, String requirement, String sessionId) {
+        log.info("🚀 [阻塞模式] 开始启动，SessionID: {}", sessionId);
+        
+        Map<String, Object> inputs = new java.util.HashMap<>();
+        inputs.put(ScriptGraphState.KEY_TOPIC, topic);
+        inputs.put(ScriptGraphState.KEY_REQUIREMENT, requirement);
+        inputs.put(ScriptGraphState.KEY_RETRY_COUNT, 0);
 
-        // 2. 使用传入的 sessionId 区分不同会话
         RunnableConfig config = RunnableConfig.builder()
                 .threadId(sessionId)
                 .build();
 
-        log.info("🚀 开始启动图流式执行，SessionID: {}", sessionId);
+        AtomicBoolean isInterrupted = new AtomicBoolean(false);
+        NodeOutput lastOutput = scriptCreationGraph.stream(inputs, config)
+                .doOnNext(output -> log.info("节点输出: {}", output.node()))
+                .blockLast();
 
-        try {
-            return scriptCreationGraph.stream(initialState, config)
-                    .doOnNext(output -> log.info("节点输出: [{}]", output.node()))
-                    .doOnError(error -> log.error("执行错误: {}", error.getMessage()))
-                    .doOnComplete(() -> log.info("✅ 流式执行结束！"));
-        } catch (Exception e) {
-            log.error("启动工作流失败", e);
-            return Flux.error(e);
+        // 准确判断：如果最后一个节点不是 __END__，说明中途被断点拦截了
+        if (lastOutput != null && !"__END__".equals(lastOutput.node())) {
+            isInterrupted.set(true);
         }
+
+        // 关键：如果中断了，立刻启动参谋 Agent
+        if (isInterrupted.get() && lastOutput != null) {
+            log.warn("🚨 阻塞模式下检测到中断，启动参谋 Agent...");
+            interventionAssistantService.prepareIntervention(sessionId, lastOutput.node(), lastOutput.state());
+        }
+
+        return lastOutput != null ? lastOutput.state().data() : Map.of();
     }
 
     /**
-     * 阻塞执行完整工作流，收集所有节点的输出内容，返回结构化的 Map。
-     *
-     * @param sessionId   会话唯一标识
-     * @param topic       创作主题
-     * @param requirement 附加要求
-     * @return 包含大纲、剧本、审稿意见等的完整结果
+     * 流式启动工作流
      */
-    public Map<String, Object> createScriptBlocking(String sessionId, String topic, String requirement) {
-        // 用于收集每个节点执行后的最新状态
-        List<String> nodesExecuted = new ArrayList<>();
+    public Flux<NodeOutput> createScriptStream(String topic, String requirement, String sessionId) {
+        log.info("🚀 开始启动图流式执行，SessionID: {}", sessionId);
 
-        // 通过 reduce 聚合所有节点输出，最后取到的就是最终状态
-        NodeOutput finalOutput = createScriptStream(sessionId, topic, requirement)
-                .doOnNext(output -> {
-                    String nodeName = output.node();
-                    // 排除掉内部的 START/END 伪节点
-                    if (!nodeName.startsWith("__")) {
-                        nodesExecuted.add(nodeName);
-                    }
-                })
-                .blockLast(); // 阻塞等到最后一个节点执行完毕
+        Map<String, Object> inputs = new java.util.HashMap<>();
+        inputs.put(ScriptGraphState.KEY_TOPIC, topic);
+        inputs.put(ScriptGraphState.KEY_REQUIREMENT, requirement);
+        inputs.put(ScriptGraphState.KEY_RETRY_COUNT, 0);
 
-        // 从最后一个节点输出中取出白板中的所有数据
-        Map<String, Object> result = new HashMap<>();
-        result.put("topic", topic);
-        result.put("requirement", requirement);
-        result.put("nodes_executed", nodesExecuted);
+        RunnableConfig config = RunnableConfig.builder()
+                .threadId(sessionId)
+                .build();
 
-        if (finalOutput != null && finalOutput.state() != null) {
-            // OverAllState 不是 Map，需用 .value(key) 方法逐个读取
-            var state = finalOutput.state();
-            result.put("outline", state.value(ScriptGraphState.KEY_OUTLINE).orElse("（未生成）"));
-            result.put("script", state.value(ScriptGraphState.KEY_SCRIPT).orElse("（未生成）"));
-            result.put("approved", state.value(ScriptGraphState.KEY_APPROVED).orElse(false));
-            result.put("review_feedback", state.value(ScriptGraphState.KEY_REVIEW_FEEDBACK).orElse("无"));
-            result.put("retry_count", state.value(ScriptGraphState.KEY_RETRY_COUNT).orElse(0));
+        return scriptCreationGraph.stream(inputs, config)
+                .doOnNext(output -> log.info("节点输出: {}", output.node()))
+                .doOnComplete(() -> log.info("✅ 流式执行结束。"));
+    }
 
-            // --- 核心业务：将最终成品归档到 scripts 表 ---
-            try {
-                ScriptEntity entity = new ScriptEntity();
-                entity.setSessionId(sessionId);
-                entity.setTopic(topic);
-                entity.setOutline((String) result.get("outline"));
-                entity.setContent((String) result.get("script"));
-                entity.setReviewFeedback((String) result.get("review_feedback"));
-                entity.setLikes(0);
-                entity.setViews(0);
-                entity.setStatus("PUBLISHED");
-                entity.setCreatedAt(LocalDateTime.now());
-                
-                scriptMapper.insert(entity);
-                log.info("✨ 剧本成品已成功归档至 MySQL 业务表 (ID: {})", entity.getId());
-            } catch (Exception e) {
-                log.error("归档剧本失败", e);
-            }
+    /**
+     * 恢复执行（接关）
+     */
+    public Flux<NodeOutput> resumeScriptStream(String sessionId, String humanFeedback) {
+        log.info("▶️ 收到导演指令，准备恢复执行。SessionID: {}", sessionId);
+
+        InterventionEntity intervention = interventionAssistantService.getLatestIntervention(sessionId);
+        if (intervention == null || intervention.getExecutionId() == null) {
+            log.error("🚨 无法接关：找不到有效的干预记录或 ID。SessionID: {}", sessionId);
+            return Flux.error(new RuntimeException("Resume failed: No executionId found"));
         }
 
-        log.info("📦 最终结果已收集完毕，共执行节点: {}", nodesExecuted);
-        return result;
+        String rawExecId = intervention.getExecutionId();
+        String realThreadId = rawExecId.contains(":") ? rawExecId.split(":")[0] : rawExecId;
+        String checkpointId = rawExecId.contains(":") && rawExecId.split(":").length > 1 ? rawExecId.split(":")[1] : null;
+
+        log.info("🎯 准备接关 - ThreadId: [{}](len:{}), Checkpoint: [{}](len:{})", 
+                realThreadId, realThreadId.length(), 
+                checkpointId, (checkpointId != null ? checkpointId.length() : 0));
+
+        interventionAssistantService.completeIntervention(sessionId, humanFeedback);
+
+        Map<String, Object> interventionState = new java.util.HashMap<>();
+        interventionState.put(ScriptGraphState.KEY_HUMAN_INTERVENTION, humanFeedback);
+
+        RunnableConfig config = RunnableConfig.builder()
+                .threadId(realThreadId)
+                .build();
+        
+        if (checkpointId != null && !checkpointId.isEmpty()) {
+            config = config.withCheckPointId(checkpointId);
+        }
+        
+        config = config.withResume();
+        
+        try {
+            return scriptCreationGraph.stream(interventionState, config)
+                    .doOnNext(output -> {
+                        log.info("接关后节点输出: {}", output.node());
+                        // 如果后续节点又中断了（比如 Reviewer），可以继续在这里递归处理
+                        // 目前简化逻辑，只处理 Planner 到 Writer 的跳转
+                    })
+                    .doOnComplete(() -> log.info("✅ 接关任务执行完毕。"))
+                    .doOnError(e -> log.error("❌ 接关过程中出错", e));
+        } catch (Exception e) {
+            log.error("💥 发起接关请求失败", e);
+            return Flux.error(e);
+        }
     }
 }

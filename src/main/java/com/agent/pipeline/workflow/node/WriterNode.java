@@ -1,8 +1,12 @@
 package com.agent.pipeline.workflow.node;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
+import com.alibaba.cloud.ai.graph.RunnableConfig;
+import com.alibaba.cloud.ai.graph.action.InterruptableAction;
+import com.alibaba.cloud.ai.graph.action.InterruptionMetadata;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.agent.pipeline.client.MiniMaxClient;
+import com.agent.pipeline.workflow.config.WorkflowProperties;
 import com.agent.pipeline.workflow.state.ScriptGraphState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,64 +16,73 @@ import java.util.Optional;
 
 /**
  * 编剧节点 (Writer)
- *
- * 职责：根据"策划"写出的大纲，或者根据"审稿"给出的反馈意见，进行具体的剧本创作。
- * 如果是第一次创作，它只看大纲；如果是被打回重写，它会参考之前的剧本和审稿反馈。
  */
-public class WriterNode implements NodeAction {
+public class WriterNode implements NodeAction, InterruptableAction {
 
     private static final Logger log = LoggerFactory.getLogger(WriterNode.class);
     private final MiniMaxClient miniMaxClient;
+    private final WorkflowProperties properties;
 
-    public WriterNode(MiniMaxClient miniMaxClient) {
+    public WriterNode(MiniMaxClient miniMaxClient, WorkflowProperties properties) {
         this.miniMaxClient = miniMaxClient;
+        this.properties = properties;
+    }
+
+    @Override
+    public Optional<InterruptionMetadata> interrupt(String nodeName, OverAllState state, RunnableConfig config) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<InterruptionMetadata> interruptAfter(String nodeName, OverAllState state, Map<String, Object> lastResult, RunnableConfig config) {
+        if (properties.shouldInterrupt("writer")) {
+            log.info("⏸️ [编剧节点] 任务完成，触发策略中断，等待导演审核剧本草稿...");
+            return Optional.of(InterruptionMetadata.builder().nodeId(nodeName).build());
+        }
+        return Optional.empty();
     }
 
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
         log.info("✍️ [编剧节点] 开始工作...");
 
-        // 1. 获取基础上下文
         String outline = state.value(ScriptGraphState.KEY_OUTLINE).map(v -> (String) v).orElse("无大纲");
-
-        // 2. 检查是否有修改意见和历史剧本
         Optional<Object> feedbackOpt = state.value(ScriptGraphState.KEY_REVIEW_FEEDBACK);
         Optional<Object> oldScriptOpt = state.value(ScriptGraphState.KEY_SCRIPT);
+        
+        // 关键：读取导演的最高指示
+        String humanFeedback = state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).map(v -> (String) v).orElse("");
 
         String prompt;
-
         if (feedbackOpt.isPresent() && oldScriptOpt.isPresent()) {
-            // 被审稿人打回重写的情况
-            log.info("接收到审稿意见，开始重写修改剧本...");
             String feedback = (String) feedbackOpt.get();
             String oldScript = (String) oldScriptOpt.get();
-
             prompt = String.format(
-                "你是一位专业的编剧。你之前根据大纲创作了一版剧本，但是审稿人给出了一些修改意见。\n" +
-                "请你根据这些【修改意见】，在【原有剧本】的基础上进行修改完善，输出一版新的完整剧本。\n" +
+                "你是一位专业的编剧。你之前创作了一版剧本，但是审稿人给出了意见。\n" +
+                "【特别注意】：导演也给出了最高指示：%s\n\n" +
+                "请你综合【审稿意见】和【导演指示】，在【原有剧本】基础上进行修改完善，输出一版新的完整剧本。\n" +
                 "--------------------------\n" +
                 "【原始大纲】：\n%s\n\n" +
                 "【审稿修改意见】：\n%s\n\n" +
                 "【原有剧本】：\n%s",
+                humanFeedback.isEmpty() ? "请继续完善" : humanFeedback,
                 outline, feedback, oldScript
             );
         } else {
-            // 第一次创作的情况
-            log.info("首次创作，根据大纲撰写剧本...");
             prompt = String.format(
                 "你是一位专业的微电影编剧。请根据以下【剧本大纲】，撰写出具体的【剧本内容】。\n" +
-                "剧本需要包含明确的场景描述（如：日/内，咖啡厅）、角色对白和动作神态提示。\n" +
+                "【特别注意】：导演给出了关键创作指示：%s\n\n" +
+                "剧本需要包含场景描述、角色对白和动作神态提示。\n" +
                 "--------------------------\n" +
                 "【剧本大纲】：\n%s",
+                humanFeedback.isEmpty() ? "无额外指示" : humanFeedback,
                 outline
             );
         }
 
-        // 3. 调用大模型生成剧本
         String script = miniMaxClient.chat(prompt);
-        log.info("✅ [编剧节点] 剧本撰写/修改完毕！内容详情:\n{}", script);
+        log.info("✅ [编剧节点] 剧本撰写完毕。");
 
-        // 4. 将最新剧本存入白板，并前往下一步：审稿人(reviewer)
         return Map.of(
             ScriptGraphState.KEY_SCRIPT, script,
             ScriptGraphState.KEY_NEXT_NODE, "reviewer"

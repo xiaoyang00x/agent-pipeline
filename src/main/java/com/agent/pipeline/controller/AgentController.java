@@ -44,6 +44,6 @@ public class AgentController {
                 ? sessionId 
                 : java.util.UUID.randomUUID().toString();
         
-        return scriptService.createScriptBlocking(finalSessionId, topic, requirement);
+        return scriptService.createScriptBlocking(topic, requirement, finalSessionId);
     }
 }

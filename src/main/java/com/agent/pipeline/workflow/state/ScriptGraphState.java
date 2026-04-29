@@ -31,6 +31,10 @@ public class ScriptGraphState {
     public static final String KEY_RETRY_COUNT = "retry_count";       // 打回重写的次数 (Integer)
     public static final String KEY_NEXT_NODE = "next_node";           // 图引擎用于路由判断的下一步节点名称 (String)
 
+    // 4. 人机协同干预相关
+    public static final String KEY_HUMAN_INTERVENTION = "human_intervention"; // 人工干预指令 (String)
+    public static final String KEY_INTERVENTION_ADVICE = "intervention_advice"; // 辅助 Agent 提供的修改建议 (String)
+
     /**
      * 配置状态的合并策略
      * 这里的 ReplaceStrategy 表示每次有新数据时，直接覆盖旧数据。
@@ -49,6 +53,9 @@ public class ScriptGraphState {
             strategies.put(KEY_APPROVED, new ReplaceStrategy());
             strategies.put(KEY_RETRY_COUNT, new ReplaceStrategy());
             strategies.put(KEY_NEXT_NODE, new ReplaceStrategy());
+
+            strategies.put(KEY_HUMAN_INTERVENTION, new ReplaceStrategy());
+            strategies.put(KEY_INTERVENTION_ADVICE, new ReplaceStrategy());
             return strategies;
         };
     }

@@ -10,8 +10,15 @@ spring:
     username: root
     password: root
 
-# MiniMax 直连配置（由 MiniMaxClient 读取，走 HTTP 直调，绕过 Spring AI 框架 Bug）
+# MiniMax 直连配置
 minimax:
   api-key: sk-cp-8CfhCseGPoEKj_ePJc6lLGVKAobDyQLIOVXsxWKCAxZ3EFaIRSOv6_rqL1fQxnKJTBMrji34Kd3Pl5k1RK9Rd_jTNzrEtC_zgdS19kPsWmqO5RN9Dm3S2Dk
   base-url: https://api.minimax.chat
   model: MiniMax-M2.7
+
+# Agent 工作流人机协同配置
+agent:
+  workflow:
+    interruption:
+      mode: SELECTIVE
+      breakpoints: planner,reviewer
