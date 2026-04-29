@@ -22,4 +22,4 @@ agent:
   workflow:
     interruption:
       mode: SELECTIVE
-      breakpoints: advisor,reviewer
+      breakpoints: planner,reviewer

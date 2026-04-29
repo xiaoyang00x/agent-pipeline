@@ -53,8 +53,6 @@ public class WriterNode implements NodeAction, InterruptableAction {
         
         // 读取导演的最高指示
         String humanFeedback = state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).map(v -> (String) v).orElse("");
-        // 读取参谋建议（来自 AdvisorNode 的产出）
-        String advisorAdvice = state.value(ScriptGraphState.KEY_INTERVENTION_ADVICE).map(v -> (String) v).orElse("");
 
         String prompt;
         if (feedbackOpt.isPresent() && oldScriptOpt.isPresent()) {
@@ -74,13 +72,11 @@ public class WriterNode implements NodeAction, InterruptableAction {
         } else {
             prompt = String.format(
                 "你是一位专业的微电影编剧。请根据以下【剧本大纲】，撰写出具体的【剧本内容】。\n" +
-                "【特别注意】：导演给出了关键创作指示：%s\n" +
-                "【参谋建议】：%s\n\n" +
+                "【特别注意】：导演给出了关键创作指示：%s\n\n" +
                 "剧本需要包含场景描述、角色对白和动作神态提示。\n" +
                 "--------------------------\n" +
                 "【剧本大纲】：\n%s",
                 humanFeedback.isEmpty() ? "无额外指示" : humanFeedback,
-                advisorAdvice.isEmpty() ? "无" : advisorAdvice,
                 outline
             );
         }

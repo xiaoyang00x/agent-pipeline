@@ -10,7 +10,6 @@ import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
 import com.alibaba.cloud.ai.graph.serializer.plain_text.jackson.SpringAIJacksonStateSerializer;
 import com.agent.pipeline.client.LlmClient;
 import com.agent.pipeline.workflow.state.ScriptGraphState;
-import com.agent.pipeline.workflow.node.AdvisorNode;
 import com.agent.pipeline.workflow.node.PlannerNode;
 import com.agent.pipeline.workflow.node.ReviewerNode;
 import com.agent.pipeline.workflow.node.WriterNode;
@@ -38,22 +37,19 @@ public class ScriptGraphConfig {
                                             WorkflowProperties workflowProperties) throws Exception {
 
         var planner  = node_async(new PlannerNode(llmClient, workflowProperties));
-        var advisor  = node_async(new AdvisorNode(llmClient, workflowProperties));
         var writer   = node_async(new WriterNode(llmClient, workflowProperties));
         var reviewer = node_async(new ReviewerNode(llmClient, workflowProperties));
 
         StateGraph workflow = new StateGraph(ScriptGraphState.createKeyStrategyFactory())
                 .addNode("planner", planner)
-                .addNode("advisor", advisor)
                 .addNode("writer", writer)
                 .addNode("reviewer", reviewer);
 
         // --- 图路由配置 ---
         workflow.addEdge(START, "planner");
-        workflow.addEdge("planner", "advisor");
 
-        // 人机协作路由：Advisor 阶段（导演审阅大纲 + 参谋建议）
-        workflow.addConditionalEdges("advisor", edge_async(state -> {
+        // 人机协作路由：Planner 阶段（导演审阅大纲 + 参谋建议）
+        workflow.addConditionalEdges("planner", edge_async(state -> {
             String feedback = (String) state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).orElse("");
             if (feedback.contains("重写") || feedback.contains("重做") || feedback.contains("不行")) {
                 log.info("🎯 [协作路由] 导演指令：打回重做策划...");

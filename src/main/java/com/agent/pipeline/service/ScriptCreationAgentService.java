@@ -96,10 +96,22 @@ public class ScriptCreationAgentService {
                 .build()
                 .withResume();
 
+        java.util.concurrent.atomic.AtomicReference<NodeOutput> lastOutputRef = new java.util.concurrent.atomic.AtomicReference<>();
+
         try {
             return scriptCreationGraph.stream(interventionState, config)
-                    .doOnNext(output -> log.info("接关后节点输出: {}", output.node()))
-                    .doOnComplete(() -> log.info("✅ 接关任务执行完毕。"))
+                    .doOnNext(output -> {
+                        log.info("接关后节点输出: {}", output.node());
+                        lastOutputRef.set(output);
+                    })
+                    .doOnComplete(() -> {
+                        log.info("✅ 接关任务执行完毕。");
+                        NodeOutput lastOutput = lastOutputRef.get();
+                        if (lastOutput != null && !"__END__".equals(lastOutput.node())) {
+                            log.warn("🚨 图引擎再次中断于 [{}] 节点，唤醒全知参谋...", lastOutput.node());
+                            interventionAssistantService.prepareIntervention(sessionId, lastOutput.node(), lastOutput.state());
+                        }
+                    })
                     .doOnError(e -> log.error("❌ 接关过程中出错", e));
         } catch (Exception e) {
             log.error("💥 发起接关请求失败", e);
