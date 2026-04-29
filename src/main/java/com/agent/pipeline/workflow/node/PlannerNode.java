@@ -61,15 +61,30 @@ public class PlannerNode implements NodeAction, InterruptableAction {
 
         String topic = state.value(ScriptGraphState.KEY_TOPIC).map(v -> (String) v).orElse("未知主题");
         String requirement = state.value(ScriptGraphState.KEY_REQUIREMENT).map(v -> (String) v).orElse("无");
+        String humanFeedback = state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).map(v -> (String) v).orElse("");
+        String oldOutline = state.value(ScriptGraphState.KEY_OUTLINE).map(v -> (String) v).orElse("");
 
-        String prompt = String.format("请为主题为【%s】的剧本创作一份大纲。要求：%s", topic, requirement);
+        String prompt;
+        if (!humanFeedback.isEmpty() && !oldOutline.isEmpty() && 
+            (humanFeedback.contains("重写") || humanFeedback.contains("不行") || humanFeedback.contains("重做"))) {
+            prompt = String.format(
+                "你是一位专业的剧本策划。之前你为主题【%s】写了一版大纲，但被导演打回了。\n" +
+                "【导演打回的指导意见】：%s\n\n" +
+                "请严格按照导演的意见，对以下【原大纲】进行推翻重写或大幅度修改，输出全新的一版大纲：\n" +
+                "--------------------------\n%s", 
+                topic, humanFeedback, oldOutline);
+        } else {
+            prompt = String.format("请为主题为【%s】的剧本创作一份大纲。要求：%s", topic, requirement);
+        }
 
         String outline = llmClient.chat(prompt);
         log.info("✅ [策划节点] 大纲已产出。");
 
-        return Map.of(
-            ScriptGraphState.KEY_OUTLINE, outline,
-            ScriptGraphState.KEY_NEXT_NODE, "writer"
-        );
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put(ScriptGraphState.KEY_OUTLINE, outline);
+        result.put(ScriptGraphState.KEY_NEXT_NODE, "writer");
+        result.put(ScriptGraphState.KEY_HUMAN_INTERVENTION, ""); // 清除幽灵反馈，防止路由死循环
+
+        return result;
     }
 }
