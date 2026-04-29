@@ -71,8 +71,10 @@ public class ScriptGraphConfig {
         ));
 
         // 5. 配置记忆持久化引擎（MySQL 模式，后端连接 H2 兼容层）
+        // 使用自定义的 JsonStateSerializer，确保数据库中存储的是可读的 JSON 格式
         var saver = MysqlSaver.builder()
                 .dataSource(dataSource)
+                .stateSerializer(new JsonStateSerializer())
                 .build();
         var compileConfig = CompileConfig.builder()
                 .saverConfig(SaverConfig.builder().register(saver).build())
