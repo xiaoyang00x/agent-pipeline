@@ -1,3 +1,0 @@
---- STEP 1: PLANNER ---
-./scratch/run_workflow.sh: line 21: syntax error near unexpected token `('
-./scratch/run_workflow.sh: line 21: `echo "--- STEP 2: WRITER (v1) ---"'
