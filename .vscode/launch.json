@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-JavaAiPlaygroundApplication<java-ai-playground>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.example.ai.JavaAiPlaygroundApplication",
+            "projectName": "java-ai-playground",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
