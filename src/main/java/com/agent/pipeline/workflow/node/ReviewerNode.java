@@ -5,7 +5,7 @@ import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.action.InterruptableAction;
 import com.alibaba.cloud.ai.graph.action.InterruptionMetadata;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.agent.pipeline.client.MiniMaxClient;
+import com.agent.pipeline.client.LlmClient;
 import com.agent.pipeline.workflow.config.WorkflowProperties;
 import com.agent.pipeline.workflow.state.ScriptGraphState;
 import org.slf4j.Logger;
@@ -23,12 +23,12 @@ import java.util.regex.Pattern;
 public class ReviewerNode implements NodeAction, InterruptableAction {
 
     private static final Logger log = LoggerFactory.getLogger(ReviewerNode.class);
-    private final MiniMaxClient miniMaxClient;
+    private final LlmClient llmClient;
     private final WorkflowProperties properties;
     private final int MAX_RETRY = 2;
 
-    public ReviewerNode(MiniMaxClient miniMaxClient, WorkflowProperties properties) {
-        this.miniMaxClient = miniMaxClient;
+    public ReviewerNode(LlmClient llmClient, WorkflowProperties properties) {
+        this.llmClient = llmClient;
         this.properties = properties;
     }
 
@@ -78,7 +78,7 @@ public class ReviewerNode implements NodeAction, InterruptableAction {
             outline, script
         );
 
-        String response = miniMaxClient.chat(prompt);
+        String response = llmClient.chat(prompt);
         log.info("审稿意见返回：{}", response);
 
         boolean approved = true;

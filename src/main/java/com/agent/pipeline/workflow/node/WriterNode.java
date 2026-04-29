@@ -5,12 +5,13 @@ import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.action.InterruptableAction;
 import com.alibaba.cloud.ai.graph.action.InterruptionMetadata;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.agent.pipeline.client.MiniMaxClient;
+import com.agent.pipeline.client.LlmClient;
 import com.agent.pipeline.workflow.config.WorkflowProperties;
 import com.agent.pipeline.workflow.state.ScriptGraphState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -20,11 +21,11 @@ import java.util.Optional;
 public class WriterNode implements NodeAction, InterruptableAction {
 
     private static final Logger log = LoggerFactory.getLogger(WriterNode.class);
-    private final MiniMaxClient miniMaxClient;
+    private final LlmClient llmClient;
     private final WorkflowProperties properties;
 
-    public WriterNode(MiniMaxClient miniMaxClient, WorkflowProperties properties) {
-        this.miniMaxClient = miniMaxClient;
+    public WriterNode(LlmClient llmClient, WorkflowProperties properties) {
+        this.llmClient = llmClient;
         this.properties = properties;
     }
 
@@ -50,8 +51,10 @@ public class WriterNode implements NodeAction, InterruptableAction {
         Optional<Object> feedbackOpt = state.value(ScriptGraphState.KEY_REVIEW_FEEDBACK);
         Optional<Object> oldScriptOpt = state.value(ScriptGraphState.KEY_SCRIPT);
         
-        // 关键：读取导演的最高指示
+        // 读取导演的最高指示
         String humanFeedback = state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).map(v -> (String) v).orElse("");
+        // 读取参谋建议（来自 AdvisorNode 的产出）
+        String advisorAdvice = state.value(ScriptGraphState.KEY_INTERVENTION_ADVICE).map(v -> (String) v).orElse("");
 
         String prompt;
         if (feedbackOpt.isPresent() && oldScriptOpt.isPresent()) {
@@ -71,21 +74,25 @@ public class WriterNode implements NodeAction, InterruptableAction {
         } else {
             prompt = String.format(
                 "你是一位专业的微电影编剧。请根据以下【剧本大纲】，撰写出具体的【剧本内容】。\n" +
-                "【特别注意】：导演给出了关键创作指示：%s\n\n" +
+                "【特别注意】：导演给出了关键创作指示：%s\n" +
+                "【参谋建议】：%s\n\n" +
                 "剧本需要包含场景描述、角色对白和动作神态提示。\n" +
                 "--------------------------\n" +
                 "【剧本大纲】：\n%s",
                 humanFeedback.isEmpty() ? "无额外指示" : humanFeedback,
+                advisorAdvice.isEmpty() ? "无" : advisorAdvice,
                 outline
             );
         }
 
-        String script = miniMaxClient.chat(prompt);
+        String script = llmClient.chat(prompt);
         log.info("✅ [编剧节点] 剧本撰写完毕。");
 
-        return Map.of(
-            ScriptGraphState.KEY_SCRIPT, script,
-            ScriptGraphState.KEY_NEXT_NODE, "reviewer"
-        );
+        // 关键：消费完人类反馈后主动清除，防止"幽灵反馈"影响后续路由判断
+        Map<String, Object> result = new HashMap<>();
+        result.put(ScriptGraphState.KEY_SCRIPT, script);
+        result.put(ScriptGraphState.KEY_NEXT_NODE, "reviewer");
+        result.put(ScriptGraphState.KEY_HUMAN_INTERVENTION, "");  // 清除幽灵反馈
+        return result;
     }
 }

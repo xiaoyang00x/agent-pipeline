@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -18,7 +19,8 @@ import java.util.Map;
  * 真实的 MiniMax 客户端
  */
 @Component
-public class MiniMaxClient {
+@Profile("!mock")
+public class MiniMaxClient implements LlmClient {
 
     private static final Logger log = LoggerFactory.getLogger(MiniMaxClient.class);
 
@@ -34,8 +36,12 @@ public class MiniMaxClient {
     @Value("${minimax.model:abab6.5-chat}")
     private String model;
 
+    @Value("${minimax.max-tokens:16384}")
+    private int maxTokens;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
+    @Override
     public String chat(String prompt) {
         log.info("🚀 准备调用真实 MiniMax API，Prompt 长度: {}", prompt.length());
         
@@ -48,7 +54,7 @@ public class MiniMaxClient {
         requestBody.put("messages", Collections.singletonList(
                 Map.of("role", "user", "content", prompt)
         ));
-        requestBody.put("tokens_to_generate", 1024);
+        requestBody.put("tokens_to_generate", maxTokens);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 

@@ -4,13 +4,13 @@ import com.alibaba.cloud.ai.graph.CompileConfig;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.GraphLifecycleListener;
-import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.checkpoint.config.SaverConfig;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
 import com.alibaba.cloud.ai.graph.serializer.plain_text.jackson.SpringAIJacksonStateSerializer;
-import com.agent.pipeline.client.MiniMaxClient;
+import com.agent.pipeline.client.LlmClient;
 import com.agent.pipeline.workflow.state.ScriptGraphState;
+import com.agent.pipeline.workflow.node.AdvisorNode;
 import com.agent.pipeline.workflow.node.PlannerNode;
 import com.agent.pipeline.workflow.node.ReviewerNode;
 import com.agent.pipeline.workflow.node.WriterNode;
@@ -33,23 +33,27 @@ public class ScriptGraphConfig {
     private static final Logger log = LoggerFactory.getLogger(ScriptGraphConfig.class);
 
     @Bean
-    public CompiledGraph scriptCreationGraph(MiniMaxClient miniMaxClient, 
-                                            DataSource dataSource, 
+    public CompiledGraph scriptCreationGraph(LlmClient llmClient,
+                                            DataSource dataSource,
                                             WorkflowProperties workflowProperties) throws Exception {
 
-        var planner = node_async(new PlannerNode(miniMaxClient, workflowProperties));
-        var writer = node_async(new WriterNode(miniMaxClient, workflowProperties));
-        var reviewer = node_async(new ReviewerNode(miniMaxClient, workflowProperties));
+        var planner  = node_async(new PlannerNode(llmClient, workflowProperties));
+        var advisor  = node_async(new AdvisorNode(llmClient, workflowProperties));
+        var writer   = node_async(new WriterNode(llmClient, workflowProperties));
+        var reviewer = node_async(new ReviewerNode(llmClient, workflowProperties));
 
         StateGraph workflow = new StateGraph(ScriptGraphState.createKeyStrategyFactory())
                 .addNode("planner", planner)
+                .addNode("advisor", advisor)
                 .addNode("writer", writer)
                 .addNode("reviewer", reviewer);
 
+        // --- 图路由配置 ---
         workflow.addEdge(START, "planner");
+        workflow.addEdge("planner", "advisor");
 
-        // --- 人机协作路由：Planner 阶段 ---
-        workflow.addConditionalEdges("planner", edge_async(state -> {
+        // 人机协作路由：Advisor 阶段（导演审阅大纲 + 参谋建议）
+        workflow.addConditionalEdges("advisor", edge_async(state -> {
             String feedback = (String) state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).orElse("");
             if (feedback.contains("重写") || feedback.contains("重做") || feedback.contains("不行")) {
                 log.info("🎯 [协作路由] 导演指令：打回重做策划...");
@@ -60,7 +64,7 @@ public class ScriptGraphConfig {
 
         workflow.addEdge("writer", "reviewer");
 
-        // --- 人机协作路由：Reviewer 阶段 ---
+        // 人机协作路由：Reviewer 阶段（导演终审）
         workflow.addConditionalEdges("reviewer", edge_async(state -> {
             String feedback = (String) state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).orElse("");
             // 导演最高指示优先
@@ -80,11 +84,11 @@ public class ScriptGraphConfig {
                 .dataSource(dataSource)
                 .stateSerializer(new SpringAIJacksonStateSerializer(workflow.getStateFactory()))
                 .build();
-        
+
         var compileConfigBuilder = CompileConfig.builder()
                 .saverConfig(SaverConfig.builder().register(saver).build());
 
-        // 终极捕获网：监控每一个动作
+        // 生命周期监听：监控图执行全过程
         compileConfigBuilder.withLifecycleListener(new GraphLifecycleListener() {
             @Override
             public void onStart(String executionId, Map<String, Object> inputs, RunnableConfig config) {

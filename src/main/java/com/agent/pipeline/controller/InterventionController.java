@@ -3,7 +3,7 @@ package com.agent.pipeline.controller;
 import com.agent.pipeline.model.InterventionEntity;
 import com.agent.pipeline.service.InterventionAssistantService;
 import com.agent.pipeline.service.ScriptCreationAgentService;
-import com.alibaba.cloud.ai.graph.NodeOutput;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -19,11 +19,14 @@ public class InterventionController {
 
     private final InterventionAssistantService assistantService;
     private final ScriptCreationAgentService agentService;
+    private final ObjectMapper objectMapper;
 
-    public InterventionController(InterventionAssistantService assistantService, 
-                                  ScriptCreationAgentService agentService) {
+    public InterventionController(InterventionAssistantService assistantService,
+                                  ScriptCreationAgentService agentService,
+                                  ObjectMapper objectMapper) {
         this.assistantService = assistantService;
         this.agentService = agentService;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -34,18 +37,14 @@ public class InterventionController {
         return assistantService.getLatestIntervention(sessionId);
     }
 
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-
     /**
-     * 提交反馈并恢复执行
-     * 
-     * 使用 SSE (Server-Sent Events) 返回后续节点的流式输出
+     * 提交反馈并恢复执行（SSE 流式输出）
      */
     @PostMapping(value = "/{sessionId}/resume", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> resume(@PathVariable String sessionId, 
+    public Flux<String> resume(@PathVariable String sessionId,
                                @RequestBody Map<String, String> payload) {
         String feedback = payload.get("feedback");
-        
+
         return agentService.resumeScriptStream(sessionId, feedback)
                 .map(nodeOutput -> {
                     try {

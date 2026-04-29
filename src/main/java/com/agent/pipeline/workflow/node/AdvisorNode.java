@@ -15,41 +15,33 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * 策划节点 (Planner)
+ * 参谋节点 (Advisor)
+ *
+ * 在 Planner 产出大纲之后，由参谋 Agent 对大纲进行专业点评并给出建议。
+ * 建议写入 Graph State，供下游 Writer 节点读取。
+ * 断点设置在此节点之后，等待导演审阅大纲与参谋建议后注入反馈。
  */
-public class PlannerNode implements NodeAction, InterruptableAction {
+public class AdvisorNode implements NodeAction, InterruptableAction {
 
-    private static final Logger log = LoggerFactory.getLogger(PlannerNode.class);
+    private static final Logger log = LoggerFactory.getLogger(AdvisorNode.class);
 
     private final LlmClient llmClient;
     private final WorkflowProperties properties;
 
-    public PlannerNode(LlmClient llmClient, WorkflowProperties properties) {
+    public AdvisorNode(LlmClient llmClient, WorkflowProperties properties) {
         this.llmClient = llmClient;
         this.properties = properties;
     }
 
-    /**
-     * 节点执行前中断
-     */
     @Override
     public Optional<InterruptionMetadata> interrupt(String nodeName, OverAllState state, RunnableConfig config) {
-        log.info("🔍 [PlannerNode] 执行前中断检查. 节点名: {}, 策略模式: {}", nodeName, properties.getMode());
-        if (properties.shouldInterrupt("planner")) {
-             log.info("⏸️ [PlannerNode] 触发‘执行前’中断信号！");
-             return Optional.of(InterruptionMetadata.builder().nodeId(nodeName).build());
-        }
         return Optional.empty();
     }
 
-    /**
-     * 节点执行后中断
-     */
     @Override
     public Optional<InterruptionMetadata> interruptAfter(String nodeName, OverAllState state, Map<String, Object> lastResult, RunnableConfig config) {
-        log.info("🔍 [PlannerNode] 执行后中断检查. 节点名: {}, 策略模式: {}", nodeName, properties.getMode());
-        if (properties.shouldInterrupt("planner")) {
-            log.info("⏸️ [PlannerNode] 触发‘执行后’中断信号！");
+        if (properties.shouldInterrupt("advisor")) {
+            log.info("⏸️ [参谋节点] 建议已就绪，触发断点，等待导演审阅大纲与参谋意见...");
             return Optional.of(InterruptionMetadata.builder().nodeId(nodeName).build());
         }
         return Optional.empty();
@@ -57,19 +49,22 @@ public class PlannerNode implements NodeAction, InterruptableAction {
 
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
-        log.info("🎬 [策划节点] 开始策划大纲...");
+        log.info("💡 [参谋节点] 开始分析大纲并生成专业建议...");
 
         String topic = state.value(ScriptGraphState.KEY_TOPIC).map(v -> (String) v).orElse("未知主题");
-        String requirement = state.value(ScriptGraphState.KEY_REQUIREMENT).map(v -> (String) v).orElse("无");
+        String outline = state.value(ScriptGraphState.KEY_OUTLINE).map(v -> (String) v).orElse("无大纲");
 
-        String prompt = String.format("请为主题为【%s】的剧本创作一份大纲。要求：%s", topic, requirement);
+        String prompt = String.format(
+            "你是一位资深的剧本参谋。以下是主题为【%s】的剧本大纲。\n" +
+            "请给出简短的专业点评和 3 条核心改进建议。\n" +
+            "--------------------------\n" +
+            "【大纲内容】：\n%s", topic, outline);
 
-        String outline = llmClient.chat(prompt);
-        log.info("✅ [策划节点] 大纲已产出。");
+        String advice = llmClient.chat(prompt);
+        log.info("✅ [参谋节点] 建议已生成。");
 
         return Map.of(
-            ScriptGraphState.KEY_OUTLINE, outline,
-            ScriptGraphState.KEY_NEXT_NODE, "writer"
+            ScriptGraphState.KEY_INTERVENTION_ADVICE, advice
         );
     }
 }
