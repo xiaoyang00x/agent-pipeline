@@ -39,11 +39,15 @@ public class ScriptGraphConfig {
         var planner  = node_async(new PlannerNode(llmClient, workflowProperties));
         var writer   = node_async(new WriterNode(llmClient, workflowProperties));
         var reviewer = node_async(new ReviewerNode(llmClient, workflowProperties));
+        
+        // 新增：导演拍板节点（空节点，仅用于承载路由逻辑，防止直接 __END__ 导致断点被绕过）
+        var directorApproval = node_async(state -> state.data());
 
         StateGraph workflow = new StateGraph(ScriptGraphState.createKeyStrategyFactory())
                 .addNode("planner", planner)
                 .addNode("writer", writer)
-                .addNode("reviewer", reviewer);
+                .addNode("reviewer", reviewer)
+                .addNode("director_approval", directorApproval);
 
         // --- 图路由配置 ---
         workflow.addEdge(START, "planner");
@@ -59,22 +63,32 @@ public class ScriptGraphConfig {
         }), Map.of("planner", "planner", "writer", "writer"));
 
         workflow.addEdge("writer", "reviewer");
+        
+        // 确保一定会走到导演拍板节点，从而强制触发 reviewer 后的断点
+        workflow.addEdge("reviewer", "director_approval");
 
         // 人机协作路由：Reviewer 阶段（导演终审）
-        workflow.addConditionalEdges("reviewer", edge_async(state -> {
+        workflow.addConditionalEdges("director_approval", edge_async(state -> {
             String feedback = (String) state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).orElse("");
-            // 导演最高指示优先
-            if (feedback.contains("通过") || feedback.contains("可以") || feedback.contains("完结")) {
-                log.info("🎯 [协作路由] 导演指令：强制通过审稿...");
-                return "end";
-            }
-            if (feedback.contains("重写") || feedback.contains("重做")) {
-                log.info("🎯 [协作路由] 导演指令：打回修改剧本...");
+            
+            // 1. 人类拥有绝对优先的拍板权：
+            if (feedback.contains("通过")) {
+                log.info("🎯 [协作路由] 导演拍板：强制通过！");
+                return END;
+            } else if (feedback.contains("重写") || feedback.contains("重做") || feedback.contains("不行")) {
+                log.info("🎯 [协作路由] 导演拍板：打回重写...");
                 return "writer";
             }
-            // 默认遵循 Agent 的评审结论
-            return (String) state.value(ScriptGraphState.KEY_NEXT_NODE).orElse("end");
-        }), Map.of("writer", "writer", "end", END, "planner", "planner"));
+            
+            // 2. 如果人类未给出明确的打回/通过指令，才参考机器评审结果
+            boolean approved = (Boolean) state.value(ScriptGraphState.KEY_APPROVED).orElse(false);
+            if (approved) {
+                log.info("🎯 [协作路由] 默认采纳机器评审：审核通过，全剧终。");
+            } else {
+                log.info("🎯 [协作路由] 默认采纳机器评审：打回给编剧修改。");
+            }
+            return approved ? END : "writer";
+        }), Map.of("writer", "writer", "end", END));
 
         var saver = MysqlSaver.builder()
                 .dataSource(dataSource)
