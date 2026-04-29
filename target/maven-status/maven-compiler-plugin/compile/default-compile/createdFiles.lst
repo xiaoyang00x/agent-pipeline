@@ -1,9 +1,11 @@
+com/agent/pipeline/model/ScriptEntity.class
 com/agent/pipeline/controller/AgentController.class
 com/agent/pipeline/workflow/config/ScriptGraphConfig.class
 com/agent/pipeline/client/MiniMaxClient.class
 com/agent/pipeline/workflow/node/WriterNode.class
 com/agent/pipeline/workflow/node/PlannerNode.class
 com/agent/pipeline/workflow/node/ReviewerNode.class
+com/agent/pipeline/mapper/ScriptMapper.class
 com/agent/pipeline/service/ScriptCreationAgentService.class
 com/agent/pipeline/AgentPipelineApplication.class
 com/agent/pipeline/workflow/state/ScriptGraphState.class

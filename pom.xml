@@ -19,39 +19,32 @@
 	</properties>
 
 	<dependencies>
-
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
-
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
-
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webflux</artifactId>
 		</dependency>
-
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 
-		<!-- Spring AI Alibaba Agent Framework（Graph Core）-->
-		<!-- 注意：此包内含 spring-ai-core:1.0.0-M2，但我们不再引入任何 Spring AI Chat Model Starter -->
-		<!-- 原因：MiniMaxChatModel / OpenAiChatModel 中调用 Message.getContent() 的字节码与 M2 的接口不兼容 -->
-		<!-- 解决方案：自定义 MiniMaxClient 直接走 HTTP 调用 MiniMax API，完全绕开问题代码 -->
+		<!-- Spring AI Alibaba Agent Framework -->
 		<dependency>
 			<groupId>com.alibaba.cloud.ai</groupId>
 			<artifactId>spring-ai-alibaba-agent-framework</artifactId>
 			<version>1.1.2.0</version>
 		</dependency>
 
-		<!-- 数据库支持：用于 Agent 状态持久化 -->
+		<!-- 数据库支持 -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-jdbc</artifactId>
@@ -60,6 +53,13 @@
 			<groupId>com.mysql</groupId>
 			<artifactId>mysql-connector-j</artifactId>
 			<scope>runtime</scope>
+		</dependency>
+		
+		<!-- MyBatis-Plus: 专门适配 Spring Boot 3 的版本 -->
+		<dependency>
+			<groupId>com.baomidou</groupId>
+			<artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+			<version>3.5.7</version>
 		</dependency>
 
 	</dependencies>

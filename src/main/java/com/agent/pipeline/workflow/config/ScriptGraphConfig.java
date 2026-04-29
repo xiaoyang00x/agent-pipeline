@@ -4,6 +4,7 @@ import com.alibaba.cloud.ai.graph.CompileConfig;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.checkpoint.config.SaverConfig;
+import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
 import com.alibaba.cloud.ai.graph.serializer.plain_text.jackson.SpringAIJacksonStateSerializer;
 import com.agent.pipeline.client.MiniMaxClient;
 import com.agent.pipeline.workflow.state.ScriptGraphState;
@@ -20,9 +21,6 @@ import static com.alibaba.cloud.ai.graph.StateGraph.END;
 import static com.alibaba.cloud.ai.graph.StateGraph.START;
 import static com.alibaba.cloud.ai.graph.action.AsyncEdgeAction.edge_async;
 import static com.alibaba.cloud.ai.graph.action.AsyncNodeAction.node_async;
-import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
-import com.alibaba.cloud.ai.graph.state.AgentStateFactory;
-import com.alibaba.cloud.ai.graph.OverAllState;
 
 /**
  * 剧本工作流配置类 (Graph Config)

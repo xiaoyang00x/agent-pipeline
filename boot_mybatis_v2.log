@@ -1,0 +1,100 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------< com.example:agent-pipeline >---------------------
+[INFO] Building Agent Pipeline 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:3.3.4:run (default-cli) > test-compile @ agent-pipeline >>>
+Downloading from spring-milestones: https://repo.spring.io/milestone/com/baomidou/mybatis-plus-spring-boot3-starter/3.5.7/mybatis-plus-spring-boot3-starter-3.5.7.jar
+Downloading from spring-milestones: https://repo.spring.io/milestone/org/mybatis/mybatis-spring/3.0.3/mybatis-spring-3.0.3.jar
+Downloading from aliyunmaven: https://maven.aliyun.com/repository/public/com/baomidou/mybatis-plus-spring-boot3-starter/3.5.7/mybatis-plus-spring-boot3-starter-3.5.7.jar
+Progress (1): 6.0 kB                    Downloaded from aliyunmaven: https://maven.aliyun.com/repository/public/com/baomidou/mybatis-plus-spring-boot3-starter/3.5.7/mybatis-plus-spring-boot3-starter-3.5.7.jar (6.0 kB at 36 kB/s)
+Downloading from aliyunmaven: https://maven.aliyun.com/repository/public/org/mybatis/mybatis-spring/3.0.3/mybatis-spring-3.0.3.jar
+Progress (1): 4.9/76 kBProgress (1): 21/76 kB Progress (1): 38/76 kBProgress (1): 54/76 kBProgress (1): 70/76 kBProgress (1): 76 kB                      Downloaded from aliyunmaven: https://maven.aliyun.com/repository/public/org/mybatis/mybatis-spring/3.0.3/mybatis-spring-3.0.3.jar (76 kB at 282 kB/s)
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ agent-pipeline ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ agent-pipeline ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ agent-pipeline ---
+[INFO] skip non existing resourceDirectory /Users/yangyu/code/agent-pipeline/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ agent-pipeline ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] 
+[INFO] <<< spring-boot:3.3.4:run (default-cli) < test-compile @ agent-pipeline <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.3.4:run (default-cli) @ agent-pipeline ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.4)
+
+2026-04-29T13:39:35.467+08:00  INFO 33847 --- [agent-pipeline] [           main] c.a.pipeline.AgentPipelineApplication    : Starting AgentPipelineApplication using Java 25.0.2 with PID 33847 (/Users/yangyu/code/agent-pipeline/target/classes started by yangyu in /Users/yangyu/code/agent-pipeline)
+2026-04-29T13:39:35.468+08:00  INFO 33847 --- [agent-pipeline] [           main] c.a.pipeline.AgentPipelineApplication    : No active profile set, falling back to 1 default profile: "default"
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.apache.tomcat.jni.Library in an unnamed module (file:/Users/yangyu/.m2/repository/org/apache/tomcat/embed/tomcat-embed-core/10.1.30/tomcat-embed-core-10.1.30.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+2026-04-29T13:39:36.041+08:00  INFO 33847 --- [agent-pipeline] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-04-29T13:39:36.048+08:00  INFO 33847 --- [agent-pipeline] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-04-29T13:39:36.048+08:00  INFO 33847 --- [agent-pipeline] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.30]
+2026-04-29T13:39:36.074+08:00  INFO 33847 --- [agent-pipeline] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-04-29T13:39:36.075+08:00  INFO 33847 --- [agent-pipeline] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 585 ms
+2026-04-29T13:39:36.216+08:00  INFO 33847 --- [agent-pipeline] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-04-29T13:39:36.301+08:00  INFO 33847 --- [agent-pipeline] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@342beaf6
+2026-04-29T13:39:36.302+08:00  INFO 33847 --- [agent-pipeline] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+ _ _   |_  _ _|_. ___ _ |    _ 
+| | |\/|_)(_| | |_\  |_)||_|_\ 
+     /               |         
+                        3.5.7 
+2026-04-29T13:39:36.671+08:00  INFO 33847 --- [agent-pipeline] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::allocateMemory has been called by io.netty.util.internal.PlatformDependent0$2 (file:/Users/yangyu/.m2/repository/io/netty/netty-common/4.1.113.Final/netty-common-4.1.113.Final.jar)
+WARNING: Please consider reporting this to the maintainers of class io.netty.util.internal.PlatformDependent0$2
+WARNING: sun.misc.Unsafe::allocateMemory will be removed in a future release
+2026-04-29T13:39:36.729+08:00  WARN 33847 --- [agent-pipeline] [           main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Failed to start bean 'webServerStartStop'
+2026-04-29T13:39:36.731+08:00  INFO 33847 --- [agent-pipeline] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-04-29T13:39:36.737+08:00  INFO 33847 --- [agent-pipeline] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-04-29T13:39:36.747+08:00  INFO 33847 --- [agent-pipeline] [           main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-04-29T13:39:36.755+08:00 ERROR 33847 --- [agent-pipeline] [           main] o.s.b.d.LoggingFailureAnalysisReporter   : 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Web server failed to start. Port 8080 was already in use.
+
+Action:
+
+Identify and stop the process that's listening on port 8080 or configure this application to listen on another port.
+
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  7.100 s
+[INFO] Finished at: 2026-04-29T13:39:37+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.springframework.boot:spring-boot-maven-plugin:3.3.4:run (default-cli) on project agent-pipeline: Process terminated with exit code: 1 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException

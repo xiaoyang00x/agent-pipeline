@@ -1,5 +1,7 @@
 package com.agent.pipeline.service;
 
+import com.agent.pipeline.mapper.ScriptMapper;
+import com.agent.pipeline.model.ScriptEntity;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.NodeOutput;
@@ -9,11 +11,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * 剧本生成服务
@@ -26,9 +28,11 @@ public class ScriptCreationAgentService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptCreationAgentService.class);
     private final CompiledGraph scriptCreationGraph;
+    private final ScriptMapper scriptMapper;
 
-    public ScriptCreationAgentService(CompiledGraph scriptCreationGraph) {
+    public ScriptCreationAgentService(CompiledGraph scriptCreationGraph, ScriptMapper scriptMapper) {
         this.scriptCreationGraph = scriptCreationGraph;
+        this.scriptMapper = scriptMapper;
     }
 
     /**
@@ -101,6 +105,22 @@ public class ScriptCreationAgentService {
             result.put("approved", state.value(ScriptGraphState.KEY_APPROVED).orElse(false));
             result.put("review_feedback", state.value(ScriptGraphState.KEY_REVIEW_FEEDBACK).orElse("无"));
             result.put("retry_count", state.value(ScriptGraphState.KEY_RETRY_COUNT).orElse(0));
+
+            // --- 核心业务：将最终成品归档到 scripts 表 ---
+            try {
+                ScriptEntity entity = new ScriptEntity();
+                entity.setSessionId(sessionId);
+                entity.setTopic(topic);
+                entity.setOutline((String) result.get("outline"));
+                entity.setContent((String) result.get("script"));
+                entity.setReviewFeedback((String) result.get("review_feedback"));
+                entity.setCreatedAt(LocalDateTime.now());
+                
+                scriptMapper.insert(entity);
+                log.info("✨ 剧本成品已成功归档至 MySQL 业务表 (ID: {})", entity.getId());
+            } catch (Exception e) {
+                log.error("归档剧本失败", e);
+            }
         }
 
         log.info("📦 最终结果已收集完毕，共执行节点: {}", nodesExecuted);
