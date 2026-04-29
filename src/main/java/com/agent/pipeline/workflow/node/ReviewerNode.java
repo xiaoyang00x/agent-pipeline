@@ -101,12 +101,10 @@ public class ReviewerNode implements NodeAction, InterruptableAction {
 
         if (approved) {
             log.info("✅ [审稿节点] 剧本审核通过！");
-            stateUpdates.put(ScriptGraphState.KEY_NEXT_NODE, "end");
         } else {
             log.warn("❌ [审稿节点] 剧本审核未通过！打回给编剧修改。当前第 {} 次打回", retryCount + 1);
             stateUpdates.put(ScriptGraphState.KEY_REVIEW_FEEDBACK, feedback);
             stateUpdates.put(ScriptGraphState.KEY_RETRY_COUNT, retryCount + 1);
-            stateUpdates.put(ScriptGraphState.KEY_NEXT_NODE, "writer");
         }
 
         return stateUpdates;

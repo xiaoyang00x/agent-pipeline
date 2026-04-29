@@ -82,7 +82,6 @@ public class PlannerNode implements NodeAction, InterruptableAction {
 
         Map<String, Object> result = new java.util.HashMap<>();
         result.put(ScriptGraphState.KEY_OUTLINE, outline);
-        result.put(ScriptGraphState.KEY_NEXT_NODE, "writer");
         result.put(ScriptGraphState.KEY_HUMAN_INTERVENTION, ""); // 清除幽灵反馈，防止路由死循环
 
         return result;

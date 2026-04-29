@@ -74,7 +74,7 @@ public class ScriptGraphConfig {
             // 1. 人类拥有绝对优先的拍板权：
             if (feedback.contains("通过")) {
                 log.info("🎯 [协作路由] 导演拍板：强制通过！");
-                return END;
+                return "finish";
             } else if (feedback.contains("重写") || feedback.contains("重做") || feedback.contains("不行")) {
                 log.info("🎯 [协作路由] 导演拍板：打回重写...");
                 return "writer";
@@ -84,11 +84,12 @@ public class ScriptGraphConfig {
             boolean approved = (Boolean) state.value(ScriptGraphState.KEY_APPROVED).orElse(false);
             if (approved) {
                 log.info("🎯 [协作路由] 默认采纳机器评审：审核通过，全剧终。");
+                return "finish";
             } else {
                 log.info("🎯 [协作路由] 默认采纳机器评审：打回给编剧修改。");
+                return "writer";
             }
-            return approved ? END : "writer";
-        }), Map.of("writer", "writer", "end", END));
+        }), Map.of("writer", "writer", "finish", END));
 
         var saver = MysqlSaver.builder()
                 .dataSource(dataSource)

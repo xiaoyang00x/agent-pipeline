@@ -87,7 +87,6 @@ public class WriterNode implements NodeAction, InterruptableAction {
         // 关键：消费完人类反馈后主动清除，防止"幽灵反馈"影响后续路由判断
         Map<String, Object> result = new HashMap<>();
         result.put(ScriptGraphState.KEY_SCRIPT, script);
-        result.put(ScriptGraphState.KEY_NEXT_NODE, "reviewer");
         result.put(ScriptGraphState.KEY_HUMAN_INTERVENTION, "");  // 清除幽灵反馈
         return result;
     }
