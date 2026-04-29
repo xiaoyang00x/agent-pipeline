@@ -114,6 +114,9 @@ public class ScriptCreationAgentService {
                 entity.setOutline((String) result.get("outline"));
                 entity.setContent((String) result.get("script"));
                 entity.setReviewFeedback((String) result.get("review_feedback"));
+                entity.setLikes(0);
+                entity.setViews(0);
+                entity.setStatus("PUBLISHED");
                 entity.setCreatedAt(LocalDateTime.now());
                 
                 scriptMapper.insert(entity);
