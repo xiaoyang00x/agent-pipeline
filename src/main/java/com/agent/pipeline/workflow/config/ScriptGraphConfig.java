@@ -8,7 +8,8 @@ import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.checkpoint.config.SaverConfig;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.mysql.MysqlSaver;
 import com.alibaba.cloud.ai.graph.serializer.plain_text.jackson.SpringAIJacksonStateSerializer;
-import com.agent.pipeline.client.LlmClient;
+import com.agent.pipeline.config.WorkflowProperties;
+import com.agent.pipeline.infrastructure.client.LlmClient;
 import com.agent.pipeline.workflow.state.ScriptGraphState;
 import com.agent.pipeline.workflow.node.PlannerNode;
 import com.agent.pipeline.workflow.node.ReviewerNode;
@@ -124,7 +125,7 @@ public class ScriptGraphConfig {
         });
 
         if ("SELECTIVE".equalsIgnoreCase(workflowProperties.getMode())) {
-            // 统一在看门人节点前挂起，确保日志顺序为：挂起 -> 参谋建议 -> 人类指令 -> 进入看门人节点 -> 执行并路由
+            // 还原为最稳健的两个物理断点
             compileConfigBuilder.interruptBefore("planner_approval", "director_approval");
         }
 

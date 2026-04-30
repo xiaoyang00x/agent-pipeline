@@ -1,4 +1,4 @@
-package com.agent.pipeline.client;
+package com.agent.pipeline.infrastructure.client;
 
 /**
  * 大语言模型客户端统一接口

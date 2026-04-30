@@ -1,7 +1,7 @@
 package com.agent.pipeline.controller;
 
-import com.agent.pipeline.mapper.ScriptMapper;
-import com.agent.pipeline.model.ScriptEntity;
+import com.agent.pipeline.infrastructure.persistence.mapper.ScriptMapper;
+import com.agent.pipeline.infrastructure.persistence.entity.ScriptEntity;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.*;

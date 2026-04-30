@@ -5,8 +5,8 @@ import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.action.InterruptableAction;
 import com.alibaba.cloud.ai.graph.action.InterruptionMetadata;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.agent.pipeline.client.LlmClient;
-import com.agent.pipeline.workflow.config.WorkflowProperties;
+import com.agent.pipeline.infrastructure.client.LlmClient;
+import com.agent.pipeline.config.WorkflowProperties;
 import com.agent.pipeline.workflow.state.ScriptGraphState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,12 +38,13 @@ public class ReviewerNode implements NodeAction, InterruptableAction {
     }
 
     @Override
-    public Optional<InterruptionMetadata> interruptAfter(String nodeName, OverAllState state, Map<String, Object> lastResult, RunnableConfig config) {
+    public Optional<InterruptionMetadata> interruptAfter(String nodeName, OverAllState state,
+            Map<String, Object> lastResult, RunnableConfig config) {
         if (properties.shouldInterrupt("reviewer")) {
             log.info("⏸️ [审稿节点] 任务完成，触发策略中断，等待导演终审...");
             return Optional.of(InterruptionMetadata.builder()
-                .nodeId(nodeName)
-                .build());
+                    .nodeId(nodeName)
+                    .build());
         }
         return Optional.empty();
     }
@@ -61,24 +62,22 @@ public class ReviewerNode implements NodeAction, InterruptableAction {
         if (retryCount >= MAX_RETRY) {
             log.warn("⚠️ 剧本已被打回修改超过 {} 次，强制通过审稿！", MAX_RETRY);
             return Map.of(
-                ScriptGraphState.KEY_APPROVED, true,
-                ScriptGraphState.KEY_NEXT_NODE, "end"
-            );
+                    ScriptGraphState.KEY_APPROVED, true,
+                    ScriptGraphState.KEY_NEXT_NODE, "end");
         }
 
         String prompt = String.format(
-            "你是一位严苛的影视项目制片人，负责审阅最终的剧本是否达标。\n" +
-            "请比对以下【策划大纲】和【剧本草稿】，判断剧本是否严重偏题、人物是否走样、情节是否有明显漏洞。\n" +
-            "请务必以如下 JSON 格式返回你的评审结果（不要包含任何其他额外的文字，只要 JSON）：\n" +
-            "{\n" +
-            "  \"approved\": true或false,\n" +
-            "  \"feedback\": \"如果通过则填无，如果不通过请详细指出修改意见。\"\n" +
-            "}\n" +
-            "--------------------------\n" +
-            "【策划大纲】：\n%s\n\n" +
-            "【剧本草稿】：\n%s",
-            outline, script
-        );
+                "你是一位严苛的影视项目制片人，负责审阅最终的剧本是否达标。\n" +
+                        "请比对以下【策划大纲】和【剧本草稿】，判断剧本是否严重偏题、人物是否走样、情节是否有明显漏洞。\n" +
+                        "请务必以如下 JSON 格式返回你的评审结果（不要包含任何其他额外的文字，只要 JSON）：\n" +
+                        "{\n" +
+                        "  \"approved\": true或false,\n" +
+                        "  \"feedback\": \"如果通过则填无，如果不通过请详细指出修改意见。\"\n" +
+                        "}\n" +
+                        "--------------------------\n" +
+                        "【策划大纲】：\n%s\n\n" +
+                        "【剧本草稿】：\n%s",
+                outline, script);
 
         String response = llmClient.chat(prompt);
         log.info("审稿意见返回：{}", response);

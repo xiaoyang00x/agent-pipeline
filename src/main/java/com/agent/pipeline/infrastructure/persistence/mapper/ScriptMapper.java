@@ -1,6 +1,6 @@
-package com.agent.pipeline.mapper;
+package com.agent.pipeline.infrastructure.persistence.mapper;
 
-import com.agent.pipeline.model.ScriptEntity;
+import com.agent.pipeline.infrastructure.persistence.entity.ScriptEntity;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 

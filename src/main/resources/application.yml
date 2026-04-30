@@ -23,3 +23,11 @@ agent:
     interruption:
       mode: SELECTIVE
       breakpoints: planner,reviewer
+
+# 全局统一日志归档（强制路径，告别乱找）
+logging:
+  file:
+    name: logs/agent-pipeline.log
+  level:
+    root: INFO
+    com.agent.pipeline: INFO

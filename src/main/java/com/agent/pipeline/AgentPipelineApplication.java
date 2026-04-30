@@ -5,7 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-@MapperScan("com.agent.pipeline.mapper")
+@MapperScan("com.agent.pipeline.infrastructure.persistence.mapper")
 public class AgentPipelineApplication {
 
 	public static void main(String[] args) {

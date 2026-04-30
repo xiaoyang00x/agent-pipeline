@@ -1,4 +1,4 @@
-package com.agent.pipeline.workflow.config;
+package com.agent.pipeline.config;
 
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;

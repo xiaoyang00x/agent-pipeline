@@ -1,24 +1,16 @@
-package com.agent.pipeline.model;
+package com.agent.pipeline.infrastructure.persistence.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-
 import java.time.LocalDateTime;
 
 @TableName("interventions")
 public class InterventionEntity {
-
     @TableId(type = IdType.AUTO)
     private Long id;
-
     private String sessionId;
-
-    /**
-     * 框架内部的真实执行 ID (用于接关恢复)
-     */
     private String executionId;
-
     private String nodeName;
     private String advice;
     private String humanFeedback;
@@ -26,7 +18,7 @@ public class InterventionEntity {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // --- Getter/Setter ---
+    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getSessionId() { return sessionId; }

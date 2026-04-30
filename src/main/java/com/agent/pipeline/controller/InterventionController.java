@@ -1,13 +1,12 @@
 package com.agent.pipeline.controller;
 
-import com.agent.pipeline.model.InterventionEntity;
+import com.agent.pipeline.infrastructure.persistence.entity.InterventionEntity;
 import com.agent.pipeline.service.InterventionAssistantService;
 import com.agent.pipeline.service.ScriptCreationAgentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux;
-
+import org.springframework.http.ResponseEntity;
 import java.util.Map;
 
 /**
@@ -38,20 +37,20 @@ public class InterventionController {
     }
 
     /**
-     * 提交反馈并恢复执行（SSE 流式输出）
+     * 提交反馈并恢复执行（异步执行，统一轮询架构）
      */
-    @PostMapping(value = "/{sessionId}/resume", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> resume(@PathVariable String sessionId,
-                               @RequestBody Map<String, String> payload) {
+    @PostMapping(value = "/{sessionId}/resume", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, String>> resume(@PathVariable String sessionId,
+                                                      @RequestBody Map<String, String> payload) {
         String feedback = payload.get("feedback");
 
-        return agentService.resumeScriptStream(sessionId, feedback)
-                .map(nodeOutput -> {
-                    try {
-                        return objectMapper.writeValueAsString(nodeOutput);
-                    } catch (Exception e) {
-                        return "{\"error\": \"序列化失败: " + e.getMessage() + "\"}";
-                    }
-                });
+        // 核心改造：Service 内部已处理异步订阅，直接调用即可
+        agentService.resumeScriptAsync(sessionId, feedback);
+
+        return ResponseEntity.accepted().body(Map.of(
+            "sessionId", sessionId,
+            "status", "RUNNING",
+            "message", "接关指令已发送，工作流继续在后台执行"
+        ));
     }
 }

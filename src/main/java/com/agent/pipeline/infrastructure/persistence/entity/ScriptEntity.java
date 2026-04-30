@@ -1,4 +1,4 @@
-package com.agent.pipeline.model;
+package com.agent.pipeline.infrastructure.persistence.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

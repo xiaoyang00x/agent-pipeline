@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * Agent 接口控制器
@@ -34,16 +36,31 @@ public class AgentController {
      * @return 包含大纲、剧本、审稿意见等的完整 JSON
      */
     @GetMapping(value = "/create-script", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, Object> createScript(
+    public ResponseEntity<Map<String, Object>> createScript(
             @RequestParam String topic,
             @RequestParam(defaultValue = "无特定要求") String requirement,
             @RequestParam(required = false) String sessionId) {
         
-        // 如果用户没传 sessionId，我们在这里生成，保证 Service 层的纯净
         String finalSessionId = (sessionId != null && !sessionId.isBlank()) 
                 ? sessionId 
                 : java.util.UUID.randomUUID().toString();
         
-        return scriptService.createScriptBlocking(topic, requirement, finalSessionId);
+        // 核心改造：Service 内部已处理异步订阅，直接调用即可
+        scriptService.createScriptAsync(topic, requirement, finalSessionId);
+            
+        return ResponseEntity.accepted().body(Map.of(
+            "sessionId", finalSessionId,
+            "status", "RUNNING",
+            "message", "工作流已在后台启动，请轮询状态"
+        ));
+    }
+
+    /**
+     * 查询工作流当前状态与变量数据
+     */
+    @GetMapping(value = "/{sessionId}/state", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, Object>> getGraphState(@PathVariable String sessionId) {
+        Map<String, Object> stateData = scriptService.getGraphState(sessionId);
+        return ResponseEntity.ok(stateData);
     }
 }

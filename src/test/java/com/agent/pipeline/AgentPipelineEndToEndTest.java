@@ -1,6 +1,6 @@
 package com.agent.pipeline;
 
-import com.agent.pipeline.model.InterventionEntity;
+import com.agent.pipeline.infrastructure.persistence.entity.InterventionEntity;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
