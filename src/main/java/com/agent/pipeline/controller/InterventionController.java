@@ -44,6 +44,9 @@ public class InterventionController {
                                                       @RequestBody Map<String, String> payload) {
         String feedback = payload.get("feedback");
 
+        // 标记该干预已完成，防止前端轮询拉到旧的 advice
+        assistantService.completeIntervention(sessionId, feedback);
+
         // 核心改造：Service 内部已处理异步订阅，直接调用即可
         agentService.resumeScriptAsync(sessionId, feedback);
 

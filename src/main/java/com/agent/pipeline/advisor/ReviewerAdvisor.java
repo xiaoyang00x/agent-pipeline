@@ -12,8 +12,8 @@ public class ReviewerAdvisor implements InterventionAdvisor {
     
     @Override
     public boolean supports(String nodeName) {
-        // 当图停留在 reviewer 或最终审批节点时都可以使用此策略
-        return "reviewer".equals(nodeName) || "director_approval".equals(nodeName);
+        // 当图停留在最终审批节点时都可以使用此策略
+        return "director_approval".equals(nodeName);
     }
 
     @Override

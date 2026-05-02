@@ -2,6 +2,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "AgentPipelineApplication",
+            "request": "launch",
+            "mainClass": "com.agent.pipeline.AgentPipelineApplication",
+            "projectName": "agent-pipeline"
+        },
+        {
+            "type": "java",
             "name": "Spring Boot-JavaAiPlaygroundApplication<java-ai-playground>",
             "request": "launch",
             "cwd": "${workspaceFolder}",

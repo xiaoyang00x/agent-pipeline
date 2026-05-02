@@ -14,6 +14,7 @@ import com.agent.pipeline.workflow.state.ScriptGraphState;
 import com.agent.pipeline.workflow.node.PlannerNode;
 import com.agent.pipeline.workflow.node.ReviewerNode;
 import com.agent.pipeline.workflow.node.WriterNode;
+import com.agent.pipeline.service.SseStreamManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -35,10 +36,11 @@ public class ScriptGraphConfig {
     @Bean
     public CompiledGraph scriptCreationGraph(LlmClient llmClient,
                                             DataSource dataSource,
-                                            WorkflowProperties workflowProperties) throws Exception {
+                                            WorkflowProperties workflowProperties,
+                                            SseStreamManager sseStreamManager) throws Exception {
 
-        var planner  = node_async(new PlannerNode(llmClient, workflowProperties));
-        var writer   = node_async(new WriterNode(llmClient, workflowProperties));
+        var planner  = node_async(new PlannerNode(llmClient, workflowProperties, sseStreamManager));
+        var writer   = node_async(new WriterNode(llmClient, workflowProperties, sseStreamManager));
         var reviewer = node_async(new ReviewerNode(llmClient, workflowProperties));
         
         // 新增：看门人节点（空节点，仅用于承载路由逻辑，并作为物理断点位）
@@ -61,12 +63,13 @@ public class ScriptGraphConfig {
         // 策划看门人路由逻辑
         workflow.addConditionalEdges("planner_approval", edge_async(state -> {
             String feedback = (String) state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).orElse("");
-            if (feedback.contains("重写") || feedback.contains("重做") || feedback.contains("不行")) {
-                log.info("🎯 [协作路由] 导演下令：策划不通过，打回重写。");
+            if (feedback.startsWith("[APPROVE]")) {
+                log.info("🎯 [协作路由] 导演下令：策划通过，进入编剧环节。");
+                return "writer";
+            } else {
+                log.info("🎯 [协作路由] 导演下令：策划不通过，打回重做。");
                 return "planner";
             }
-            log.info("🎯 [协作路由] 导演下令：策划通过，进入编剧环节。");
-            return "writer";
         }), Map.of("planner", "planner", "writer", "writer"));
 
         workflow.addEdge("writer", "reviewer");
@@ -79,15 +82,15 @@ public class ScriptGraphConfig {
             String feedback = (String) state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).orElse("");
             
             // 1. 人类绝对优先拍板
-            if (feedback.contains("通过")) {
+            if (feedback.startsWith("[APPROVE]")) {
                 log.info("🎯 [协作路由] 导演下令：正式通过，项目完结。");
                 return "finish";
-            } else if (feedback.contains("重写") || feedback.contains("重做") || feedback.contains("不行")) {
+            } else if (feedback.startsWith("[REJECT]")) {
                 log.info("🎯 [协作路由] 导演下令：剧本不通过，打回重写。");
                 return "writer";
             }
             
-            // 2. 默认参考机器评审
+            // 2. 默认参考机器评审 (如果 feedback 是空，说明没有人类干预介入)
             boolean approved = (Boolean) state.value(ScriptGraphState.KEY_APPROVED).orElse(false);
             if (approved) {
                 log.info("🎯 [协作路由] 默认采纳机器评审：审核通过。");

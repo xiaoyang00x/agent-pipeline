@@ -20,6 +20,7 @@ public class ScriptGraphState {
     // 1. 用户输入
     public static final String KEY_TOPIC = "topic";                   // 创作主题
     public static final String KEY_REQUIREMENT = "requirement";       // 具体要求
+    public static final String KEY_SESSION_ID = "session_id";         // 推演会话 ID
 
     // 2. 各个节点的产出物
     public static final String KEY_OUTLINE = "outline";               // 策划节点输出的大纲
@@ -45,6 +46,7 @@ public class ScriptGraphState {
             HashMap<String, KeyStrategy> strategies = new HashMap<>();
             strategies.put(KEY_TOPIC, new ReplaceStrategy());
             strategies.put(KEY_REQUIREMENT, new ReplaceStrategy());
+            strategies.put(KEY_SESSION_ID, new ReplaceStrategy());
             
             strategies.put(KEY_OUTLINE, new ReplaceStrategy());
             strategies.put(KEY_SCRIPT, new ReplaceStrategy());

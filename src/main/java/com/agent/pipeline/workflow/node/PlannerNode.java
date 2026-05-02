@@ -11,6 +11,8 @@ import com.agent.pipeline.workflow.state.ScriptGraphState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.agent.pipeline.service.SseStreamManager;
+
 import java.util.Map;
 import java.util.Optional;
 
@@ -23,10 +25,12 @@ public class PlannerNode implements NodeAction, InterruptableAction {
 
     private final LlmClient llmClient;
     private final WorkflowProperties properties;
+    private final SseStreamManager sseStreamManager;
 
-    public PlannerNode(LlmClient llmClient, WorkflowProperties properties) {
+    public PlannerNode(LlmClient llmClient, WorkflowProperties properties, SseStreamManager sseStreamManager) {
         this.llmClient = llmClient;
         this.properties = properties;
+        this.sseStreamManager = sseStreamManager;
     }
 
     /**
@@ -61,12 +65,12 @@ public class PlannerNode implements NodeAction, InterruptableAction {
 
         String topic = state.value(ScriptGraphState.KEY_TOPIC).map(v -> (String) v).orElse("未知主题");
         String requirement = state.value(ScriptGraphState.KEY_REQUIREMENT).map(v -> (String) v).orElse("无");
-        String humanFeedback = state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).map(v -> (String) v).orElse("");
+        String rawFeedback = state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).map(v -> (String) v).orElse("");
+        String humanFeedback = rawFeedback.replace("[REJECT]", "").replace("[APPROVE]", "").trim();
         String oldOutline = state.value(ScriptGraphState.KEY_OUTLINE).map(v -> (String) v).orElse("");
 
         String prompt;
-        if (!humanFeedback.isEmpty() && !oldOutline.isEmpty() && 
-            (humanFeedback.contains("重写") || humanFeedback.contains("不行") || humanFeedback.contains("重做"))) {
+        if (!humanFeedback.isEmpty() && !oldOutline.isEmpty()) {
             prompt = String.format(
                 "你是一位专业的剧本策划。之前你为主题【%s】写了一版大纲，但被导演打回了。\n" +
                 "【导演打回的指导意见】：%s\n\n" +
@@ -77,7 +81,13 @@ public class PlannerNode implements NodeAction, InterruptableAction {
             prompt = String.format("请为主题为【%s】的剧本创作一份大纲。要求：%s", topic, requirement);
         }
 
-        String outline = llmClient.chat(prompt);
+        String sessionId = state.value(ScriptGraphState.KEY_SESSION_ID).map(v -> (String) v).orElse("");
+
+        String outline = llmClient.chatStream(prompt, token -> {
+            if (!sessionId.isEmpty()) {
+                sseStreamManager.sendToken(sessionId, "outline_chunk", token);
+            }
+        });
         log.info("✅ [策划节点] 大纲已产出。");
 
         Map<String, Object> result = new java.util.HashMap<>();

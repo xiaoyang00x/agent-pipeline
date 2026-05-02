@@ -31,12 +31,19 @@ public class ScriptCreationAgentService {
         Map<String, Object> inputs = new HashMap<>();
         inputs.put(ScriptGraphState.KEY_TOPIC, topic);
         inputs.put(ScriptGraphState.KEY_REQUIREMENT, requirement);
+        inputs.put(ScriptGraphState.KEY_SESSION_ID, sessionId);
         inputs.put(ScriptGraphState.KEY_RETRY_COUNT, 0);
 
         RunnableConfig config = RunnableConfig.builder().threadId(sessionId).build();
-        scriptCreationGraph.stream(inputs, config)
-                .doOnNext(output -> log.info("【进度】Session: {}, 节点: {}", sessionId, output.node()))
-                .subscribe();
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                scriptCreationGraph.stream(inputs, config)
+                        .doOnNext(output -> log.info("【进度】Session: {}, 节点: {}", sessionId, output.node()))
+                        .subscribe();
+            } catch (Exception e) {
+                log.error("❌ 启动流水线失败", e);
+            }
+        });
     }
 
     public Map<String, Object> getGraphState(String sessionId) {
@@ -101,14 +108,16 @@ public class ScriptCreationAgentService {
         stateUpdate.put(ScriptGraphState.KEY_HUMAN_INTERVENTION, feedback);
         RunnableConfig config = RunnableConfig.builder().threadId(sessionId).build();
         
-        try {
-            // 必须接收 updateState 返回的包含新 Checkpoint 信息的 config
-            RunnableConfig newConfig = scriptCreationGraph.updateState(config, stateUpdate);
-            
-            // 使用新 config 和空输入(null)触发真正的“断点继续”
-            scriptCreationGraph.stream(null, newConfig).subscribe();
-        } catch (Exception e) {
-            log.error("❌ 恢复图执行失败", e);
-        }
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                // 必须接收 updateState 返回的包含新 Checkpoint 信息的 config
+                RunnableConfig newConfig = scriptCreationGraph.updateState(config, stateUpdate);
+                
+                // 使用新 config 和空输入(null)触发真正的“断点继续”
+                scriptCreationGraph.stream(null, newConfig).subscribe();
+            } catch (Exception e) {
+                log.error("❌ 恢复图执行失败", e);
+            }
+        });
     }
 }

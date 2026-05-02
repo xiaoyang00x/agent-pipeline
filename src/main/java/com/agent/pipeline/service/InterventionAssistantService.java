@@ -25,19 +25,32 @@ public class InterventionAssistantService {
     private final InterventionMapper interventionMapper;
     private final LlmClient llmClient;
     private final List<InterventionAdvisor> advisors;
+    private final SseStreamManager sseStreamManager;
 
     public InterventionAssistantService(InterventionMapper interventionMapper, 
                                       LlmClient llmClient,
-                                      List<InterventionAdvisor> advisors) {
+                                      List<InterventionAdvisor> advisors,
+                                      SseStreamManager sseStreamManager) {
         this.interventionMapper = interventionMapper;
         this.llmClient = llmClient;
         this.advisors = advisors;
+        this.sseStreamManager = sseStreamManager;
     }
 
     /**
      * 在图引擎中断后被触发，动态生成参谋建议并入库 (策略模式实现)
      */
     public void prepareIntervention(String sessionId, String nodeName, OverAllState state) {
+        // 0. 提前检查是否支持该节点的干预（过滤掉如 writer 等纯自动化节点），避免无效查询和日志刷屏
+        InterventionAdvisor advisor = advisors.stream()
+                .filter(a -> a.supports(nodeName))
+                .findFirst()
+                .orElse(null);
+
+        if (advisor == null) {
+            return; // 静默跳过，不需要干预
+        }
+
         // 1. 幂等性检查：只要存在 GENERATING 或 WAITING 状态的建议，直接返回，防止轮询并发调用
         InterventionEntity existing = interventionMapper.selectOne(
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<InterventionEntity>()
@@ -52,17 +65,6 @@ public class InterventionAssistantService {
 
         log.info("📢 [全知参谋] 正在为断点节点 [{}] 准备诊断建议...", nodeName);
 
-        // 2. 寻找匹配的建议策略
-        InterventionAdvisor advisor = advisors.stream()
-                .filter(a -> a.supports(nodeName))
-                .findFirst()
-                .orElse(null);
-
-        if (advisor == null) {
-            log.warn("⚠️ 未找到支持节点 [{}] 的参谋策略，跳过建议生成。", nodeName);
-            return;
-        }
-
         // 3. ✨ 关键修复：立即入库一个 GENERATING 状态的占位符，阻断后续轮询的并发触发
         InterventionEntity placeholder = new InterventionEntity();
         placeholder.setSessionId(sessionId);
@@ -74,24 +76,28 @@ public class InterventionAssistantService {
         placeholder.setUpdatedAt(LocalDateTime.now());
         interventionMapper.insert(placeholder);
 
-        // 4. 构建 Prompt 并同步调用大模型 (耗时操作)
+        // 4. 构建 Prompt 并异步调用大模型 (解决阻塞问题)
         String prompt = advisor.buildPrompt(state);
-        log.info("🧠 [全知参谋] 正在分析当前局势...");
+        log.info("🧠 [全知参谋] 正在提交异步任务以分析局势...");
         
-        try {
-            String advice = llmClient.chat(prompt);
-            
-            // 5. 成功后更新为 WAITING 状态，前端方可拉取到真实建议
-            placeholder.setAdvice(advice);
-            placeholder.setStatus("WAITING");
-            placeholder.setUpdatedAt(LocalDateTime.now());
-            interventionMapper.updateById(placeholder);
-            log.info("✅ 参谋建议已准备就绪并入库。策略提供者: {}", advisor.getClass().getSimpleName());
-        } catch (Exception e) {
-            log.error("❌ 参谋建议生成失败", e);
-            // 失败时直接删除占位符，允许下次重试
-            interventionMapper.deleteById(placeholder.getId());
-        }
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                String advice = llmClient.chatStream(prompt, token -> {
+                    sseStreamManager.sendToken(sessionId, "advisor_chunk", token);
+                });
+                
+                // 5. 成功后更新为 WAITING 状态，前端方可拉取到真实建议
+                placeholder.setAdvice(advice);
+                placeholder.setStatus("WAITING");
+                placeholder.setUpdatedAt(LocalDateTime.now());
+                interventionMapper.updateById(placeholder);
+                log.info("✅ 参谋建议已准备就绪并入库。策略提供者: {}", advisor.getClass().getSimpleName());
+            } catch (Exception e) {
+                log.error("❌ 参谋建议生成失败", e);
+                // 失败时直接删除占位符，允许下次重试
+                interventionMapper.deleteById(placeholder.getId());
+            }
+        });
     }
 
     public InterventionEntity getLatestIntervention(String sessionId) {

@@ -12,7 +12,7 @@ public class PlannerAdvisor implements InterventionAdvisor {
     
     @Override
     public boolean supports(String nodeName) {
-        return "planner".equals(nodeName) || "planner_approval".equals(nodeName);
+        return "planner_approval".equals(nodeName);
     }
 
     @Override

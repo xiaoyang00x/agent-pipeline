@@ -1,22 +1,24 @@
 package com.agent.pipeline.infrastructure.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
- * 真实的 MiniMax 客户端
+ * 真实的 MiniMax 客户端 (WebFlux 流式版)
  */
 @Component
 @Profile("!mock")
@@ -30,26 +32,29 @@ public class MiniMaxClient implements LlmClient {
     @Value("${minimax.api-key:}")
     private String apiKey;
 
-    @Value("${minimax.group.id:}")
-    private String groupId;
-
     @Value("${minimax.model:abab6.5-chat}")
     private String model;
 
     @Value("${minimax.max-tokens:16384}")
     private int maxTokens;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final WebClient webClient = WebClient.builder().build();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public String chat(String prompt) {
+        return chatStream(prompt, null);
+    }
+
+    @Override
+    public String chatStream(String prompt, Consumer<String> onToken) {
         int maxRetries = 3;
         int retryCount = 0;
         long delay = 1000; // 初始延迟 1 秒
 
         while (retryCount < maxRetries) {
             try {
-                return callMiniMaxApi(prompt);
+                return callMiniMaxApiStream(prompt, onToken);
             } catch (Exception e) {
                 retryCount++;
                 log.warn("⚠️ 调用 MiniMax 失败 (尝试 {}/{}), 错误: {}", retryCount, maxRetries, e.getMessage());
@@ -72,43 +77,51 @@ public class MiniMaxClient implements LlmClient {
         return "Error: 未知错误";
     }
 
-    private String callMiniMaxApi(String prompt) {
-        log.info("🚀 正在调用真实 MiniMax API，Prompt 长度: {}", prompt.length());
+    private String callMiniMaxApiStream(String prompt, Consumer<String> onToken) {
+        log.info("🚀 正在调用真实 MiniMax API (流式模式)，Prompt 长度: {}", prompt.length());
         
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
-
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", model);
         requestBody.put("messages", Collections.singletonList(
                 Map.of("role", "user", "content", prompt)
         ));
         requestBody.put("tokens_to_generate", maxTokens);
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        requestBody.put("stream", true);
 
         String fullUrl = baseUrl + "/v1/text/chatcompletion_v2";
         log.info("📡 正在发送 HTTP 请求... URL: {}", fullUrl);
-        
-        Map<String, Object> response = restTemplate.postForObject(fullUrl, entity, Map.class);
-        
-        if (response != null) {
-            // 兼容新旧版返回格式
-            if (response.containsKey("reply") && response.get("reply") != null) {
-                return (String) response.get("reply");
-            }
-            if (response.get("choices") != null) {
-                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-                if (!choices.isEmpty()) {
-                    Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-                    return (String) message.get("content");
+
+        StringBuilder fullResponse = new StringBuilder();
+
+        Flux<ServerSentEvent<String>> stream = webClient.post()
+                .uri(fullUrl)
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {});
+
+        stream.doOnNext(event -> {
+            String data = event.data();
+            if (data != null && !data.equals("[DONE]")) {
+                try {
+                    JsonNode root = objectMapper.readTree(data);
+                    if (root.has("choices") && root.get("choices").isArray() && root.get("choices").size() > 0) {
+                        JsonNode delta = root.get("choices").get(0).get("delta");
+                        if (delta != null && delta.has("content")) {
+                            String token = delta.get("content").asText();
+                            fullResponse.append(token);
+                            if (onToken != null) {
+                                onToken.accept(token);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("解析 SSE 数据包异常: {}", e.getMessage());
                 }
             }
-            if (response.get("base_resp") != null) {
-                throw new RuntimeException("MiniMax 业务报错: " + response.get("base_resp").toString());
-            }
-        }
-        throw new RuntimeException("MiniMax 返回格式异常或为空");
+        }).blockLast();
+
+        return fullResponse.toString();
     }
 }

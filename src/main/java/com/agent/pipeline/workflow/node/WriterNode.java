@@ -11,6 +11,8 @@ import com.agent.pipeline.workflow.state.ScriptGraphState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.agent.pipeline.service.SseStreamManager;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -23,10 +25,12 @@ public class WriterNode implements NodeAction, InterruptableAction {
     private static final Logger log = LoggerFactory.getLogger(WriterNode.class);
     private final LlmClient llmClient;
     private final WorkflowProperties properties;
+    private final SseStreamManager sseStreamManager;
 
-    public WriterNode(LlmClient llmClient, WorkflowProperties properties) {
+    public WriterNode(LlmClient llmClient, WorkflowProperties properties, SseStreamManager sseStreamManager) {
         this.llmClient = llmClient;
         this.properties = properties;
+        this.sseStreamManager = sseStreamManager;
     }
 
     @Override
@@ -52,7 +56,8 @@ public class WriterNode implements NodeAction, InterruptableAction {
         Optional<Object> oldScriptOpt = state.value(ScriptGraphState.KEY_SCRIPT);
         
         // 读取导演的最高指示
-        String humanFeedback = state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).map(v -> (String) v).orElse("");
+        String rawFeedback = state.value(ScriptGraphState.KEY_HUMAN_INTERVENTION).map(v -> (String) v).orElse("");
+        String humanFeedback = rawFeedback.replace("[REJECT]", "").replace("[APPROVE]", "").trim();
 
         String prompt;
         if (feedbackOpt.isPresent() && oldScriptOpt.isPresent()) {
@@ -81,7 +86,13 @@ public class WriterNode implements NodeAction, InterruptableAction {
             );
         }
 
-        String script = llmClient.chat(prompt);
+        String sessionId = state.value(ScriptGraphState.KEY_SESSION_ID).map(v -> (String) v).orElse("");
+
+        String script = llmClient.chatStream(prompt, token -> {
+            if (!sessionId.isEmpty()) {
+                sseStreamManager.sendToken(sessionId, "script_chunk", token);
+            }
+        });
         log.info("✅ [编剧节点] 剧本撰写完毕。");
 
         // 关键：消费完人类反馈后主动清除，防止"幽灵反馈"影响后续路由判断
